@@ -55,89 +55,249 @@ bool topology_isAcceptablePacket(ieee802154_header_iht* ieee802514_header) {
    bool returnVal;
    
    returnVal=FALSE;
-   switch (idmanager_getMyID(ADDR_64B)->addr_64b[7]) {
-      case 0x4c:
+   switch ((idmanager_getMyID(ADDR_64B)->addr_64b[6]<<8) | idmanager_getMyID(ADDR_64B)->addr_64b[7]) {
+      case 0xf185:
          if (
-               ieee802514_header->src.addr_64b[7]==0x00 ||
-               ieee802514_header->src.addr_64b[7]==0x60
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x8d59 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90dd
             ) {
             returnVal=TRUE;
          }
          break;
-      case 0x60:
+      case 0x8d59:
          if (
-               ieee802514_header->src.addr_64b[7]==0x4c ||
-               ieee802514_header->src.addr_64b[7]==0x97 ||
-               ieee802514_header->src.addr_64b[7]==0xc8
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0xf185 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x8d5c ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x9098
             ) {
             returnVal=TRUE;
          }
          break;
-      case 0xc8:
+      case 0x8d5c:
          if (
-               ieee802514_header->src.addr_64b[7]==0x60 ||
-               ieee802514_header->src.addr_64b[7]==0x6f ||
-               ieee802514_header->src.addr_64b[7]==0x50
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x8d59 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x8d70 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x9080
             ) {
             returnVal=TRUE;
          }
          break;
-      case 0x50:
+      case 0x8d70:
          if (
-               ieee802514_header->src.addr_64b[7]==0xc8
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x8d5c ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x8d73 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x8d76
             ) {
             returnVal=TRUE;
          }
          break;
-      case 0x6f:
+      case 0x8d73:
          if (
-               ieee802514_header->src.addr_64b[7]==0x85 ||
-               ieee802514_header->src.addr_64b[7]==0x97 ||
-               ieee802514_header->src.addr_64b[7]==0xc8
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x8d70
             ) {
             returnVal=TRUE;
          }
          break;
-      case 0x85:
+      case 0x8d76:
          if (
-               ieee802514_header->src.addr_64b[7]==0x5c ||
-               ieee802514_header->src.addr_64b[7]==0x97 ||
-               ieee802514_header->src.addr_64b[7]==0x6f
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x8d70
             ) {
             returnVal=TRUE;
          }
          break;
-      case 0xa8:
+      case 0x9080:
          if (
-               ieee802514_header->src.addr_64b[7]==0x5c ||
-               ieee802514_header->src.addr_64b[7]==0x97 ||
-               ieee802514_header->src.addr_64b[7]==0x00
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x8d5c ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x908b ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x9096
             ) {
             returnVal=TRUE;
          }
          break;
-      case 0x00:
+      case 0x908b:
          if (
-               ieee802514_header->src.addr_64b[7]==0x4c ||
-               ieee802514_header->src.addr_64b[7]==0xa8
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x9080
             ) {
             returnVal=TRUE;
          }
          break;
-      case 0x97:
+      case 0x9096:
          if (
-               ieee802514_header->src.addr_64b[7]==0xa8 ||
-               ieee802514_header->src.addr_64b[7]==0x85 ||
-               ieee802514_header->src.addr_64b[7]==0x6f ||
-               ieee802514_header->src.addr_64b[7]==0x60
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x9080
             ) {
             returnVal=TRUE;
          }
          break;
-      case 0x5c:
+      case 0x9098:
          if (
-               ieee802514_header->src.addr_64b[7]==0x85 ||
-               ieee802514_header->src.addr_64b[7]==0xa8
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x8d59 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90a5 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90ad
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x90a5:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x9098 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90a6 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90a8
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x90a6:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90a5
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x90a8:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90a5
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x90ad:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x9098 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90d1 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90d5
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x90d1:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90ad
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x90d5:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90ad
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x90dd:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0xf185 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90e4 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94bc
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x90e4:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90dd ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90f0 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94ad
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x90f0:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90e4 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90f7 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x9483
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x90f7:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90f0
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x9483:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90f0
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x94ad:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90e4 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94b4 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94b8
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x94b4:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94ad
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x94b8:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94ad
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x94bc:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x90dd ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94be ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94e3
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x94be:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94bc ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94c6 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94d5
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x94c6:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94be
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x94d5:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94be
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0x94e3:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94bc ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0xede6 ||
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0xedfa
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0xede6:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94e3
+            ) {
+            returnVal=TRUE;
+         }
+         break;
+      case 0xedfa:
+         if (
+            ((ieee802514_header->src.addr_64b[6]<<8) | ieee802514_header->src.addr_64b[7])==0x94e3
             ) {
             returnVal=TRUE;
          }
