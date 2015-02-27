@@ -11,15 +11,15 @@
 #include "openserial.h"
 #include "openrandom.h"
 #include "scheduler.h"
+//#include "ADC_Channel.h"
 #include "idmanager.h"
 #include "IEEE802154E.h"
-#include "idmanager.h"
 
 //=========================== defines =========================================
 
 /// inter-packet period (in ms)
 #define CEXAMPLEPERIOD  5000
-#define PAYLOADLEN      62
+#define PAYLOADLEN      40
 
 const uint8_t cexample_path0[] = "ex";
 uint8_t indexPacket = 0;
@@ -33,7 +33,7 @@ cexample_vars_t cexample_vars;
 owerror_t cexample_receive(OpenQueueEntry_t* msg,
                     coap_header_iht*  coap_header,
                     coap_option_iht*  coap_options);
-void    cexample_timer_cb(void);
+void    cexample_timer_cb(opentimer_id_t id);
 void    cexample_task_cb(void);
 void    cexample_sendDone(OpenQueueEntry_t* msg,
                        owerror_t error);
@@ -68,14 +68,13 @@ owerror_t cexample_receive(OpenQueueEntry_t* msg,
 
 //timer fired, but we don't want to execute task in ISR mode
 //instead, push task to scheduler with COAP priority, and let scheduler take care of it
-void cexample_timer_cb(){
+void cexample_timer_cb(opentimer_id_t id){
    scheduler_push_task(cexample_task_cb,TASKPRIO_COAP);
 }
 
 void cexample_task_cb() {
    OpenQueueEntry_t*    pkt;
    owerror_t            outcome;
-   uint8_t              numOptions;
    
    // don't run if not synch
    if (ieee154e_isSynch() == FALSE) return;
@@ -108,14 +107,20 @@ void cexample_task_cb() {
    pkt->payload[2]                = idmanager_getMyID(ADDR_64B)->addr_64b[7];
    pkt->payload[3]                = indexPacket;
    indexPacket++;
+
+   packetfunctions_reserveHeaderSize(pkt,1);
+   pkt->payload[0] = COAP_PAYLOAD_MARKER;
    
-   numOptions = 0;
+   // content-type option
+   packetfunctions_reserveHeaderSize(pkt,2);
+   pkt->payload[0]                = (COAP_OPTION_NUM_CONTENTFORMAT - COAP_OPTION_NUM_URIPATH) << 4
+                                    | 1;
+   pkt->payload[1]                = COAP_MEDTYPE_APPOCTETSTREAM;
    // location-path option
    packetfunctions_reserveHeaderSize(pkt,sizeof(cexample_path0)-1);
    memcpy(&pkt->payload[0],cexample_path0,sizeof(cexample_path0)-1);
    packetfunctions_reserveHeaderSize(pkt,1);
    pkt->payload[0]                = ((COAP_OPTION_NUM_URIPATH) << 4) | (sizeof(cexample_path0)-1);
-   numOptions++;
    
    // metadata
    pkt->l4_destination_port       = WKP_UDP_COAP;
@@ -127,7 +132,7 @@ void cexample_task_cb() {
       pkt,
       COAP_TYPE_NON,
       COAP_CODE_REQ_PUT,
-      numOptions,
+      1,
       &cexample_vars.desc
    );
    
