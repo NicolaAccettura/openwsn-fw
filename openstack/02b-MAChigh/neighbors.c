@@ -19,7 +19,7 @@ void registerNewNeighbor(
         bool         joinPrioPresent,
         uint8_t      joinPrio
      );
-bool isNeighbor(open_addr_t* neighbor);
+bool findNeighbor(open_addr_t* neighbor);
 void removeNeighbor(uint8_t neighborIndex);
 bool isThisRowMatching(
         open_addr_t* address,
@@ -441,23 +441,19 @@ void neighbors_indicateRxDIO(OpenQueueEntry_t* msg) {
    
    // update rank of that neighbor in table
    neighbors_vars.dio = (icmpv6rpl_dio_ht*)(msg->payload);
-   if (isNeighbor(&(msg->l2_nextORpreviousHop))==TRUE) {
-      for (i=0;i<MAXNUMNEIGHBORS;i++) {
-         if (isThisRowMatching(&(msg->l2_nextORpreviousHop),i)) {
-            if (
-                  neighbors_vars.dio->rank > neighbors_vars.neighbors[i].DAGrank &&
-                  neighbors_vars.dio->rank - neighbors_vars.neighbors[i].DAGrank >(DEFAULTLINKCOST*2*MINHOPRANKINCREASE)
-               ) {
-                // the new DAGrank looks suspiciously high, only increment a bit
-                neighbors_vars.neighbors[i].DAGrank += (DEFAULTLINKCOST*2*MINHOPRANKINCREASE);
-                openserial_printError(COMPONENT_NEIGHBORS,ERR_LARGE_DAGRANK,
-                               (errorparameter_t)neighbors_vars.dio->rank,
-                               (errorparameter_t)neighbors_vars.neighbors[i].DAGrank);
-            } else {
-               neighbors_vars.neighbors[i].DAGrank = neighbors_vars.dio->rank;
-            }
-            break;
-         }
+   i = findNeighbor(&(msg->l2_nextORpreviousHop));
+   if (i<MAXNUMNEIGHBORS) {
+      if (
+            neighbors_vars.dio->rank > neighbors_vars.neighbors[i].DAGrank &&
+            neighbors_vars.dio->rank - neighbors_vars.neighbors[i].DAGrank >(DEFAULTLINKCOST*2*MINHOPRANKINCREASE)
+         ) {
+          // the new DAGrank looks suspiciously high, only increment a bit
+          neighbors_vars.neighbors[i].DAGrank += (DEFAULTLINKCOST*2*MINHOPRANKINCREASE);
+          openserial_printError(COMPONENT_NEIGHBORS,ERR_LARGE_DAGRANK,
+                         (errorparameter_t)neighbors_vars.dio->rank,
+                         (errorparameter_t)neighbors_vars.neighbors[i].DAGrank);
+      } else {
+         neighbors_vars.neighbors[i].DAGrank = neighbors_vars.dio->rank;
       }
    } 
    // update my routing information
@@ -600,7 +596,7 @@ void registerNewNeighbor(open_addr_t* address,
       return;
    }
    // add this neighbor
-   if (isNeighbor(address)==FALSE) {
+   if (findNeighbor(address)==MAXNUMNEIGHBORS) {
       i=0;
       while(i<MAXNUMNEIGHBORS) {
          if (neighbors_vars.neighbors[i].used==FALSE) {
@@ -647,14 +643,14 @@ void registerNewNeighbor(open_addr_t* address,
    }
 }
 
-bool isNeighbor(open_addr_t* neighbor) {
+bool findNeighbor(open_addr_t* neighbor) {
    uint8_t i=0;
    for (i=0;i<MAXNUMNEIGHBORS;i++) {
       if (isThisRowMatching(neighbor,i)) {
-         return TRUE;
+         return i;
       }
    }
-   return FALSE;
+   return MAXNUMNEIGHBORS;
 }
 
 void removeNeighbor(uint8_t neighborIndex) {
