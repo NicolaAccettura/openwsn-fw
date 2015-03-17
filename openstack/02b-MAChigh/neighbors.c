@@ -318,55 +318,44 @@ void neighbors_indicateRx(open_addr_t* l2_src,
                           bool         joinPrioPresent,
                           uint8_t      joinPrio) {
    uint8_t i;
-   bool    newNeighbor;
    
-   // update existing neighbor
-   newNeighbor = TRUE;
-   for (i=0;i<MAXNUMNEIGHBORS;i++) {
-      if (isThisRowMatching(l2_src,i)) {
+   i = findNeighbor(l2_src);
+   if (i!=MAXNUMNEIGHBORS) {
+      // update existing neighbor
          
-         // this is not a new neighbor
-         newNeighbor = FALSE;
-         
-         // update numRx, rssi, asn
-         neighbors_vars.neighbors[i].numRx++;
-         neighbors_vars.neighbors[i].rssi=rssi;
-         memcpy(&neighbors_vars.neighbors[i].asn,asnTs,sizeof(asn_t));
-         //update jp
-         if (joinPrioPresent==TRUE){
-            neighbors_vars.neighbors[i].joinPrio=joinPrio;
-         }
-         
-         // update stableNeighbor, switchStabilityCounter
-         if (neighbors_vars.neighbors[i].stableNeighbor==FALSE) {
-            if (neighbors_vars.neighbors[i].rssi>BADNEIGHBORMAXRSSI) {
-               neighbors_vars.neighbors[i].switchStabilityCounter++;
-               if (neighbors_vars.neighbors[i].switchStabilityCounter>=SWITCHSTABILITYTHRESHOLD) {
-                  neighbors_vars.neighbors[i].switchStabilityCounter=0;
-                  neighbors_vars.neighbors[i].stableNeighbor=TRUE;
-               }
-            } else {
-               neighbors_vars.neighbors[i].switchStabilityCounter=0;
-            }
-         } else if (neighbors_vars.neighbors[i].stableNeighbor==TRUE) {
-            if (neighbors_vars.neighbors[i].rssi<GOODNEIGHBORMINRSSI) {
-               neighbors_vars.neighbors[i].switchStabilityCounter++;
-               if (neighbors_vars.neighbors[i].switchStabilityCounter>=SWITCHSTABILITYTHRESHOLD) {
-                  neighbors_vars.neighbors[i].switchStabilityCounter=0;
-                   neighbors_vars.neighbors[i].stableNeighbor=FALSE;
-               }
-            } else {
-               neighbors_vars.neighbors[i].switchStabilityCounter=0;
-            }
-         }
-         
-         // stop looping
-         break;
+      // update numRx, rssi, asn
+      neighbors_vars.neighbors[i].numRx++;
+      neighbors_vars.neighbors[i].rssi=rssi;
+      memcpy(&neighbors_vars.neighbors[i].asn,asnTs,sizeof(asn_t));
+      //update jp
+      if (joinPrioPresent==TRUE){
+         neighbors_vars.neighbors[i].joinPrio=joinPrio;
       }
-   }
-   
-   // register new neighbor
-   if (newNeighbor==TRUE) {
+      
+      // update stableNeighbor, switchStabilityCounter
+      if (neighbors_vars.neighbors[i].stableNeighbor==FALSE) {
+         if (neighbors_vars.neighbors[i].rssi>BADNEIGHBORMAXRSSI) {
+            neighbors_vars.neighbors[i].switchStabilityCounter++;
+            if (neighbors_vars.neighbors[i].switchStabilityCounter>=SWITCHSTABILITYTHRESHOLD) {
+               neighbors_vars.neighbors[i].switchStabilityCounter=0;
+               neighbors_vars.neighbors[i].stableNeighbor=TRUE;
+            }
+         } else {
+            neighbors_vars.neighbors[i].switchStabilityCounter=0;
+         }
+      } else if (neighbors_vars.neighbors[i].stableNeighbor==TRUE) {
+         if (neighbors_vars.neighbors[i].rssi<GOODNEIGHBORMINRSSI) {
+            neighbors_vars.neighbors[i].switchStabilityCounter++;
+            if (neighbors_vars.neighbors[i].switchStabilityCounter>=SWITCHSTABILITYTHRESHOLD) {
+               neighbors_vars.neighbors[i].switchStabilityCounter=0;
+                neighbors_vars.neighbors[i].stableNeighbor=FALSE;
+            }
+         } else {
+            neighbors_vars.neighbors[i].switchStabilityCounter=0;
+         }
+      }
+   } else {
+      // register new neighbor
       registerNewNeighbor(l2_src, rssi, asnTs, joinPrioPresent,joinPrio);
    }
 }
@@ -630,16 +619,14 @@ void registerNewNeighbor(open_addr_t* address,
             if (iHaveAPreferedParent==FALSE && idmanager_getIsDAGroot()==FALSE) {      
                neighbors_vars.neighbors[i].parentPreference     = MAXPREFERENCE;
             }
-            break;
+            return;
          }
          i++;
       }
-      if (i==MAXNUMNEIGHBORS) {
-         openserial_printError(COMPONENT_NEIGHBORS,ERR_NEIGHBORS_FULL,
-                               (errorparameter_t)MAXNUMNEIGHBORS,
-                               (errorparameter_t)0);
-         return;
-      }
+      openserial_printError(COMPONENT_NEIGHBORS,ERR_NEIGHBORS_FULL,
+                            (errorparameter_t)MAXNUMNEIGHBORS,
+                            (errorparameter_t)0);
+      return;
    }
 }
 
