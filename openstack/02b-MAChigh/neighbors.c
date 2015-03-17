@@ -150,7 +150,7 @@ open_addr_t* neighbors_getKANeighbor(uint16_t kaPeriod) {
    
    // scan through the neighbor table, and populate addrPreferred and addrOther
    for (i=0;i<MAXNUMNEIGHBORS;i++) {
-      if (neighbors_vars.neighbors[i].used==1) {
+      if (neighbors_vars.neighbors[i].used==TRUE) {
          timeSinceHeard = ieee154e_asnDiff(&neighbors_vars.neighbors[i].asn);
          if (timeSinceHeard>kaPeriod) {
             // this neighbor needs to be KA'ed to
@@ -320,7 +320,7 @@ void neighbors_indicateRx(open_addr_t* l2_src,
    uint8_t i;
    
    i = findNeighbor(l2_src);
-   if (i!=MAXNUMNEIGHBORS) {
+   if (i<MAXNUMNEIGHBORS) {
       // update existing neighbor
          
       // update numRx, rssi, asn
@@ -540,7 +540,7 @@ void  neighbors_removeOld() {
    uint16_t   timeSinceHeard;
    
    for (i=0;i<MAXNUMNEIGHBORS;i++) {
-      if (neighbors_vars.neighbors[i].used==1) {
+      if (neighbors_vars.neighbors[i].used==TRUE) {
          timeSinceHeard = ieee154e_asnDiff(&neighbors_vars.neighbors[i].asn);
          if (timeSinceHeard>DESYNCTIMEOUT) {
             removeNeighbor(i);
@@ -631,13 +631,14 @@ void registerNewNeighbor(open_addr_t* address,
 }
 
 bool findNeighbor(open_addr_t* neighbor) {
-   uint8_t i=0;
-   for (i=0;i<MAXNUMNEIGHBORS;i++) {
-      if (isThisRowMatching(neighbor,i)) {
-         return i;
+   uint8_t row=0;
+   while (row<MAXNUMNEIGHBORS) {
+      if (isThisRowMatching(neighbor,row)) {
+         break;
       }
+      row++;
    }
-   return MAXNUMNEIGHBORS;
+   return row;
 }
 
 void removeNeighbor(uint8_t neighborIndex) {
