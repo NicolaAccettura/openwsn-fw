@@ -32,6 +32,7 @@ typedef struct {
    bool             stableNeighbor;
    uint8_t          switchStabilityCounter;
    open_addr_t      addr_64b;
+   DODAGversion_t   DODAGversion;
    dagrank_t        DAGrank;
    int8_t           rssi;
    uint8_t          numRx;
@@ -55,6 +56,7 @@ typedef struct {
    uint8_t         last_addr_byte;   // last byte of the neighbor's address
    int8_t          rssi;
    uint8_t         parentPreference;
+   DODAGversion_t  DODAGversion;
    dagrank_t       DAGrank;
    uint16_t        asn; 
 } netDebugNeigborEntry_t;
@@ -64,6 +66,7 @@ END_PACK
    
 typedef struct {
    neighborRow_t        neighbors[MAXNUMNEIGHBORS];
+   DODAGversion_t  		myDODAGversion;
    dagrank_t            myDAGrank;
    uint8_t              debugRow;
    icmpv6rpl_dio_ht*    dio; //keep it global to be able to debug correctly.

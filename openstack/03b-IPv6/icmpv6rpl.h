@@ -72,6 +72,8 @@ static const uint8_t all_routers_multicast[] = {
 
 //=========================== typedef =========================================
 
+typedef uint8_t DODAGversion_t;
+
 //===== DIO
 
 /**
@@ -80,7 +82,7 @@ static const uint8_t all_routers_multicast[] = {
 BEGIN_PACK
 typedef struct {
    uint8_t         rplinstanceId;      ///< set by the DODAG root.
-   uint8_t         verNumb;
+   DODAGversion_t  verNumb;
    dagrank_t       rank;
    uint8_t         rplOptions;
    uint8_t         DTSN;
