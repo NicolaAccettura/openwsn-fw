@@ -195,7 +195,12 @@ open_addr_t* neighbors_getKANeighbor(uint16_t kaPeriod) {
 \returns TRUE if the DODAGID has been changed, FALSE otherwise.
 */
 bool neighbors_isDODAGIDchanged(void) {
-   return neighbors.f_changedDODAGID;
+   bool returnVal;
+
+   returnVal = neighbors_vars.f_changedDODAGID;
+   neighbors_vars.f_changedDODAGID = FALSE;
+
+   return returnVal;
 }
 
 /**
