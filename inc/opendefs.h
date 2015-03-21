@@ -237,7 +237,7 @@ enum {
 
 
 typedef uint16_t  errorparameter_t;
-typedef uint16_t  dagrank_t;
+typedef uint16_t  rank_t;
 typedef uint8_t   owerror_t;
 
 BEGIN_PACK

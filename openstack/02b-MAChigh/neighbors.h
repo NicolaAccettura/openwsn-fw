@@ -32,8 +32,9 @@ typedef struct {
    bool             stableNeighbor;
    uint8_t          switchStabilityCounter;
    open_addr_t      addr_64b;
+   uint8_t          DODAGID[16];
    DODAGversion_t   DODAGversion;
-   dagrank_t        DAGrank;
+   rank_t           rank;
    int8_t           rssi;
    uint8_t          numRx;
    uint8_t          numTx;
@@ -56,8 +57,9 @@ typedef struct {
    uint8_t         last_addr_byte;   // last byte of the neighbor's address
    int8_t          rssi;
    uint8_t         parentPreference;
+   uint8_t         DODAGID[16];
    DODAGversion_t  DODAGversion;
-   dagrank_t       DAGrank;
+   rank_t          rank;
    uint16_t        asn; 
 } netDebugNeigborEntry_t;
 END_PACK
@@ -66,52 +68,56 @@ END_PACK
    
 typedef struct {
    neighborRow_t        neighbors[MAXNUMNEIGHBORS];
-   DODAGversion_t  		myDODAGversion;
-   dagrank_t            myDAGrank;
+   bool                 f_changedDODAGID;
+   uint8_t              myDODAGID[16];
+   DODAGversion_t       myDODAGversion;
+   rank_t               myRank;
    uint8_t              debugRow;
    icmpv6rpl_dio_ht*    dio; //keep it global to be able to debug correctly.
 } neighbors_vars_t;
 
 //=========================== prototypes ======================================
 
-void          neighbors_init(void);
+void            neighbors_init(void);
 
 // getters
-dagrank_t     neighbors_getMyDAGrank(void);
-uint8_t       neighbors_getNumNeighbors(void);
-bool          neighbors_getPreferredParentEui64(open_addr_t* addressToWrite);
-open_addr_t*  neighbors_getKANeighbor(uint16_t kaPeriod);
+rank_t          neighbors_getMyDAGrank(void);
+DODAGversion_t  neighbors_getMyDODAGVersion(void);
+uint8_t         neighbors_getNumNeighbors(void);
+bool            neighbors_getPreferredParentEui64(open_addr_t* addressToWrite);
+open_addr_t*    neighbors_getKANeighbor(uint16_t kaPeriod);
 
 // interrogators
-bool          neighbors_isStableNeighbor(open_addr_t* address);
-bool          neighbors_isPreferredParent(open_addr_t* address);
-bool          neighbors_isNeighborWithLowerDAGrank(uint8_t index);
-bool          neighbors_isNeighborWithHigherDAGrank(uint8_t index);
+bool            neighbors_isDODAGIDchanged(void);
+bool            neighbors_isStableNeighbor(open_addr_t* address);
+bool            neighbors_isPreferredParent(open_addr_t* address);
+bool            neighbors_isNeighborWithLowerDAGrank(uint8_t index);
+bool            neighbors_isNeighborWithHigherDAGrank(uint8_t index);
 
 // updating neighbor information
-void          neighbors_indicateRx(
+void            neighbors_indicateRx(
    open_addr_t*         l2_src,
    int8_t               rssi,
    asn_t*               asnTimestamp,
    bool                 joinPrioPresent,
    uint8_t              joinPrio
 );
-void          neighbors_indicateTx(
+void            neighbors_indicateTx(
    open_addr_t*         dest,
    uint8_t              numTxAttempts,
    bool                 was_finally_acked,
    asn_t*               asnTimestamp
 );
-void          neighbors_indicateRxDIO(OpenQueueEntry_t* msg);
+void            neighbors_indicateRxDIO(OpenQueueEntry_t* msg);
 
 // get addresses
-void          neighbors_getNeighbor(open_addr_t* address,uint8_t addr_type,uint8_t index);
+void            neighbors_getNeighbor(open_addr_t* address,uint8_t addr_type,uint8_t index);
 // managing routing info
-void          neighbors_updateMyDAGrankAndNeighborPreference(void);
+void            neighbors_updateMyDAGrankAndNeighborPreference(void);
 // maintenance
-void          neighbors_removeOld(void);
+void            neighbors_removeOld(void);
 // debug
-bool          debugPrint_neighbors(void);
+bool            debugPrint_neighbors(void);
 
 /**
 \}

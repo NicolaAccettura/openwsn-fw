@@ -83,7 +83,7 @@ BEGIN_PACK
 typedef struct {
    uint8_t         rplinstanceId;      ///< set by the DODAG root.
    DODAGversion_t  verNumb;
-   dagrank_t       rank;
+   rank_t          rank;
    uint8_t         rplOptions;
    uint8_t         DTSN;
    uint8_t         flags;
@@ -138,7 +138,6 @@ END_PACK
 typedef struct {
    // admin
    bool                      busySending;             ///< currently sending DIO/DAO.
-   uint8_t                   fDodagidWritten;         ///< is DODAGID already written to DIO/DAO?
    // DIO-related
    icmpv6rpl_dio_ht          dio;                     ///< pre-populated DIO packet.
    open_addr_t               dioDestination;          ///< IPv6 destination address for DIOs.

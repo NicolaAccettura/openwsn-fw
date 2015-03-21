@@ -44,12 +44,11 @@ void icmpv6rpl_init() {
    //=== admin
    
    icmpv6rpl_vars.busySending               = FALSE;
-   icmpv6rpl_vars.fDodagidWritten           = 0;
    
    //=== DIO
    
    icmpv6rpl_vars.dio.rplinstanceId         = 0x00;        ///< TODO: put correct value
-   icmpv6rpl_vars.dio.verNumb               = 0x00;        ///< TODO: put correct value
+   // verNumb: to be populated upon TX
    // rank: to be populated upon TX
    icmpv6rpl_vars.dio.rplOptions            = MOP_DIO_A | \
                                               MOP_DIO_B | \
@@ -140,9 +139,7 @@ void  icmpv6rpl_writeDODAGid(uint8_t* dodagid) {
       dodagid,
       sizeof(icmpv6rpl_vars.dao.DODAGID)
    );
-   
-   // remember I got a DODAGID
-   icmpv6rpl_vars.fDodagidWritten = 1;
+
 }
 
 uint8_t icmpv6rpl_getRPLIntanceID(){
@@ -204,17 +201,19 @@ void icmpv6rpl_receive(OpenQueueEntry_t* msg) {
          // update neighbor table
          neighbors_indicateRxDIO(msg);
          
-         // write DODAGID in DIO and DAO
-         icmpv6rpl_writeDODAGid(&(((icmpv6rpl_dio_ht*)(msg->payload))->DODAGID[0]));
+         if (neighbors_isDODAGIDchanged()) {
+            // write DODAGID in DIO and DAO
+            icmpv6rpl_writeDODAGid(&(((icmpv6rpl_dio_ht*)(msg->payload))->DODAGID[0]));
          
-         // update my prefix
-         myPrefix.type = ADDR_PREFIX;
-         memcpy(
-            myPrefix.prefix,
-            &((icmpv6rpl_dio_ht*)(msg->payload))->DODAGID[0],
-            sizeof(myPrefix.prefix)
-         );
-         idmanager_setMyID(&myPrefix);
+            // update my prefix
+            myPrefix.type = ADDR_PREFIX;
+            memcpy(
+               myPrefix.prefix,
+               &((icmpv6rpl_dio_ht*)(msg->payload))->DODAGID[0],
+               sizeof(myPrefix.prefix)
+            );
+            idmanager_setMyID(&myPrefix);
+         }
          
          break;
       
@@ -338,6 +337,7 @@ void sendDIO() {
    
    //===== DIO payload
    // note: DIO is already mostly populated
+   icmpv6rpl_vars.dio.verNumb               = neighbors_getMyDODAGVersion();
    icmpv6rpl_vars.dio.rank                  = neighbors_getMyDAGrank();
    packetfunctions_reserveHeaderSize(msg,sizeof(icmpv6rpl_dio_ht));
    memcpy(
@@ -464,7 +464,7 @@ void sendDAO() {
    
    //===== fill in packet
    
-   //NOTE: limit to preferrred parent only the number of DAO transit addresses to send
+   //NOTE: limit to preferred parent only the number of DAO transit addresses to send
    
    //=== transit option -- from RFC 6550, page 55 - 1 transit information header per parent is required. 
    //getting only preferred parent as transit

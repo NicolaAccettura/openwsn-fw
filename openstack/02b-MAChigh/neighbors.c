@@ -38,9 +38,9 @@ void neighbors_init() {
    
    // set myDAGrank
    if (idmanager_getIsDAGroot()==TRUE) {
-      neighbors_vars.myDAGrank=0;
+      neighbors_vars.myRank=0;
    } else {
-      neighbors_vars.myDAGrank=DEFAULTDAGRANK;
+      neighbors_vars.myRank=DEFAULTDAGRANK;
    }
 }
 
@@ -51,8 +51,17 @@ void neighbors_init() {
 
 \returns This mote's current DAG rank.
 */
-dagrank_t neighbors_getMyDAGrank() {
-   return neighbors_vars.myDAGrank;
+rank_t neighbors_getMyDAGrank() {
+   return neighbors_vars.myRank;
+}
+
+/**
+\brief Retrieve this mote's current DODAG version.
+
+\returns This mote's current DODAG version.
+*/
+DODAGversion_t neighbors_getMyDODAGVersion() {
+   return neighbors_vars.myDODAGversion;
 }
 
 /**
@@ -82,7 +91,7 @@ bool neighbors_getPreferredParentEui64(open_addr_t* addressToWrite) {
    uint8_t   i;
    bool      foundPreferred;
    uint8_t   numNeighbors;
-   dagrank_t minRankVal;
+   rank_t minRankVal;
    uint8_t   minRankIdx;
    
    addressToWrite->type = ADDR_NONE;
@@ -101,8 +110,8 @@ bool neighbors_getPreferredParentEui64(open_addr_t* addressToWrite) {
             foundPreferred=TRUE;
          }
          // identify neighbor with lowest rank
-         if (neighbors_vars.neighbors[i].DAGrank < minRankVal) {
-            minRankVal=neighbors_vars.neighbors[i].DAGrank;
+         if (neighbors_vars.neighbors[i].rank < minRankVal) {
+            minRankVal=neighbors_vars.neighbors[i].rank;
             minRankIdx=i;
          }
          numNeighbors++;
@@ -181,6 +190,15 @@ open_addr_t* neighbors_getKANeighbor(uint16_t kaPeriod) {
 //===== interrogators
 
 /**
+\brief Indicate whether the DODAGID has been changed
+
+\returns TRUE if the DODAGID has been changed, FALSE otherwise.
+*/
+bool neighbors_isDODAGIDchanged(void) {
+   return neighbors.f_changedDODAGID;
+}
+
+/**
 \brief Indicate whether some neighbor is a stable neighbor
 
 \param[in] address The address of the neighbor, a full 128-bit IPv6 addres.
@@ -253,7 +271,7 @@ bool neighbors_isNeighborWithLowerDAGrank(uint8_t index) {
    bool    returnVal;
    
    if (neighbors_vars.neighbors[index].used==TRUE &&
-       neighbors_vars.neighbors[index].DAGrank < neighbors_getMyDAGrank()) { 
+       neighbors_vars.neighbors[index].rank < neighbors_getMyDAGrank()) { 
       returnVal = TRUE;
    } else {
       returnVal = FALSE;
@@ -274,7 +292,7 @@ bool neighbors_isNeighborWithHigherDAGrank(uint8_t index) {
    bool    returnVal;
    
    if (neighbors_vars.neighbors[index].used==TRUE &&
-       neighbors_vars.neighbors[index].DAGrank >= neighbors_getMyDAGrank()) { 
+       neighbors_vars.neighbors[index].rank >= neighbors_getMyDAGrank()) { 
       returnVal = TRUE;
    } else {
       returnVal = FALSE;
@@ -423,16 +441,16 @@ void neighbors_indicateRxDIO(OpenQueueEntry_t* msg) {
    i = findNeighborRow(&(msg->l2_nextORpreviousHop));
    if (i<MAXNUMNEIGHBORS) {
       if (
-            neighbors_vars.dio->rank > neighbors_vars.neighbors[i].DAGrank &&
-            neighbors_vars.dio->rank - neighbors_vars.neighbors[i].DAGrank >(DEFAULTLINKCOST*2*MINHOPRANKINCREASE)
+            neighbors_vars.dio->rank > neighbors_vars.neighbors[i].rank &&
+            neighbors_vars.dio->rank - neighbors_vars.neighbors[i].rank >(DEFAULTLINKCOST*2*MINHOPRANKINCREASE)
          ) {
          // the new DAGrank looks suspiciously high, only increment a bit
-         neighbors_vars.neighbors[i].DAGrank += (DEFAULTLINKCOST*2*MINHOPRANKINCREASE);
+         neighbors_vars.neighbors[i].rank += (DEFAULTLINKCOST*2*MINHOPRANKINCREASE);
          openserial_printError(COMPONENT_NEIGHBORS,ERR_LARGE_DAGRANK,
                                (errorparameter_t)neighbors_vars.dio->rank,
-                               (errorparameter_t)neighbors_vars.neighbors[i].DAGrank);
+                               (errorparameter_t)neighbors_vars.neighbors[i].rank);
       } else {
-         neighbors_vars.neighbors[i].DAGrank = neighbors_vars.dio->rank;
+         neighbors_vars.neighbors[i].rank = neighbors_vars.dio->rank;
       }
    }
    // update my routing information
@@ -472,18 +490,18 @@ routing decisions to change. Examples are:
 void neighbors_updateMyDAGrankAndNeighborPreference() {
    uint8_t   i;
    uint16_t  rankIncrease;
-   uint32_t  tentativeDAGrank; // 32-bit since is used to sum
+   uint32_t  tentativeRank; // 32-bit since is used to sum
    uint8_t   prefParentIdx;
    bool      prefParentFound;
    
    // if I'm a DAGroot, my DAGrank is always 0
    if ((idmanager_getIsDAGroot())==TRUE) {
-      neighbors_vars.myDAGrank=0;
+      neighbors_vars.myRank=0;
       return;
    }
    
    // reset my DAG rank to max value. May be lowered below.
-   neighbors_vars.myDAGrank  = MAXDAGRANK;
+   neighbors_vars.myRank  = MAXDAGRANK;
    
    // by default, I haven't found a preferred parent
    prefParentFound           = FALSE;
@@ -504,11 +522,11 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
             rankIncrease = (uint16_t)((((float)neighbors_vars.neighbors[i].numTx)/((float)neighbors_vars.neighbors[i].numTxACK))*2*MINHOPRANKINCREASE);
          }
          
-         tentativeDAGrank = neighbors_vars.neighbors[i].DAGrank+rankIncrease;
-         if ( tentativeDAGrank<neighbors_vars.myDAGrank &&
-              tentativeDAGrank<MAXDAGRANK) {
+         tentativeRank = neighbors_vars.neighbors[i].rank+rankIncrease;
+         if ( tentativeRank<neighbors_vars.myRank &&
+              tentativeRank<MAXDAGRANK) {
             // found better parent, lower my DAGrank
-            neighbors_vars.myDAGrank   = tentativeDAGrank;
+            neighbors_vars.myRank   = tentativeRank;
             prefParentFound            = TRUE;
             prefParentIdx              = i;
          }
@@ -587,7 +605,7 @@ void registerNewNeighbor(open_addr_t* address,
       neighbors_vars.neighbors[row].stableNeighbor         = TRUE;
       neighbors_vars.neighbors[row].switchStabilityCounter = 0;
       memcpy(&neighbors_vars.neighbors[row].addr_64b,address,sizeof(open_addr_t));
-      neighbors_vars.neighbors[row].DAGrank                = DEFAULTDAGRANK;
+      neighbors_vars.neighbors[row].rank                = DEFAULTDAGRANK;
       neighbors_vars.neighbors[row].rssi                   = rssi;
       neighbors_vars.neighbors[row].numRx                  = 1;
       neighbors_vars.neighbors[row].numTx                  = 0;
@@ -635,7 +653,7 @@ void removeNeighbor(uint8_t neighborIndex) {
    //neighbors_vars.neighbors[neighborIndex].addr_16b.type           = ADDR_NONE; // to save RAM
    neighbors_vars.neighbors[neighborIndex].addr_64b.type             = ADDR_NONE;
    //neighbors_vars.neighbors[neighborIndex].addr_128b.type          = ADDR_NONE; // to save RAM
-   neighbors_vars.neighbors[neighborIndex].DAGrank                   = DEFAULTDAGRANK;
+   neighbors_vars.neighbors[neighborIndex].rank                   = DEFAULTDAGRANK;
    neighbors_vars.neighbors[neighborIndex].rssi                      = 0;
    neighbors_vars.neighbors[neighborIndex].numRx                     = 0;
    neighbors_vars.neighbors[neighborIndex].numTx                     = 0;
