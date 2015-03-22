@@ -32,7 +32,6 @@ typedef struct {
    bool             stableNeighbor;
    uint8_t          switchStabilityCounter;
    open_addr_t      addr_64b;
-   uint8_t          DODAGID[16];
    DODAGversion_t   DODAGversion;
    rank_t           rank;
    int8_t           rssi;
@@ -57,7 +56,6 @@ typedef struct {
    uint8_t         last_addr_byte;   // last byte of the neighbor's address
    int8_t          rssi;
    uint8_t         parentPreference;
-   uint8_t         DODAGID[16];
    DODAGversion_t  DODAGversion;
    rank_t          rank;
    uint16_t        asn; 

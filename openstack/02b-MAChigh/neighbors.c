@@ -25,6 +25,11 @@ bool isThisRowMatching(
         open_addr_t* address,
         uint8_t      rowNumber
      );
+bool neighbors_isSameDODAGID(void);
+bool neighbors_isDODAGverNumbHigher(
+        DODAGversion_t firstVerNumb, 
+        DODAGversion_t secondVerNumb
+     );
 
 //=========================== public ==========================================
 
@@ -437,6 +442,7 @@ The fields which are updated are:
 */
 void neighbors_indicateRxDIO(OpenQueueEntry_t* msg) {
    uint8_t          i;
+   uint8_t          row;
   
    // take ownership over the packet
    msg->owner = COMPONENT_NEIGHBORS;
@@ -445,17 +451,38 @@ void neighbors_indicateRxDIO(OpenQueueEntry_t* msg) {
    neighbors_vars.dio = (icmpv6rpl_dio_ht*)(msg->payload);
    i = findNeighborRow(&(msg->l2_nextORpreviousHop));
    if (i<MAXNUMNEIGHBORS) {
-      if (
-            neighbors_vars.dio->rank > neighbors_vars.neighbors[i].rank &&
-            neighbors_vars.dio->rank - neighbors_vars.neighbors[i].rank >(DEFAULTLINKCOST*2*MINHOPRANKINCREASE)
-         ) {
-         // the new DAGrank looks suspiciously high, only increment a bit
-         neighbors_vars.neighbors[i].rank += (DEFAULTLINKCOST*2*MINHOPRANKINCREASE);
-         openserial_printError(COMPONENT_NEIGHBORS,ERR_LARGE_DAGRANK,
-                               (errorparameter_t)neighbors_vars.dio->rank,
-                               (errorparameter_t)neighbors_vars.neighbors[i].rank);
+      if (neighbors_isSameDODAGID()) {
+         
+         neighbors_vars.neighbors[i].DODAGversion = neighbors_vars.dio->verNumb;
+         if (
+               neighbors_vars.dio->rank > neighbors_vars.neighbors[i].rank &&
+               neighbors_vars.dio->rank - neighbors_vars.neighbors[i].rank >(DEFAULTLINKCOST*2*MINHOPRANKINCREASE)
+            ) {
+            // the new DAGrank looks suspiciously high, only increment a bit
+            neighbors_vars.neighbors[i].rank += (DEFAULTLINKCOST*2*MINHOPRANKINCREASE);
+            openserial_printError(COMPONENT_NEIGHBORS,ERR_LARGE_DAGRANK,
+                                  (errorparameter_t)neighbors_vars.dio->rank,
+                                  (errorparameter_t)neighbors_vars.neighbors[i].rank);
+         } else {
+            neighbors_vars.neighbors[i].rank = neighbors_vars.dio->rank;
+         }
+
       } else {
+         
+         for (row=0;row<MAXNUMNEIGHBORS;row++) {
+            if (row != i) {
+               removeNeighbor(row);
+            }
+         }
+         memcpy(
+            &(neighbors_vars.myDODAGID[0]),
+            &(neighbors_vars.dio->DODAGID[0]),
+            sizeof(neighbors_vars.dio->DODAGID)
+         );
+         neighbors_vars.f_changedDODAGID = TRUE;
+         neighbors_vars.neighbors[i].DODAGversion = neighbors_vars.dio->verNumb;
          neighbors_vars.neighbors[i].rank = neighbors_vars.dio->rank;
+         
       }
    }
    // update my routing information
@@ -681,4 +708,16 @@ bool isThisRowMatching(open_addr_t* address, uint8_t rowNumber) {
                                (errorparameter_t)3);
          return FALSE;
    }
+}
+
+bool neighbors_isSameDODAGID() {
+   return memcmp(
+      &(neighbors_vars.myDODAGID[0]),
+      &(neighbors_vars.dio->DODAGID[0]),
+      sizeof(neighbors_vars.dio->DODAGID)
+   );
+}
+
+bool neighbors_isDODAGverNumbHigher(DODAGversion_t firstVerNumb, DODAGversion_t secondVerNumb) {
+   return (firstVerNumb > secondVerNumb);
 }
