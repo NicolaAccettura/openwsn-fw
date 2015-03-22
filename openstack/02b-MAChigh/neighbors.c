@@ -586,7 +586,7 @@ void  neighbors_removeOld() {
             removeNeighbor(i);
          }
       }
-   } 
+   }
 }
 
 //===== debug
@@ -678,21 +678,7 @@ uint8_t findNeighborRow(open_addr_t* neighbor) {
 }
 
 void removeNeighbor(uint8_t neighborIndex) {
-   neighbors_vars.neighbors[neighborIndex].used                      = FALSE;
-   neighbors_vars.neighbors[neighborIndex].parentPreference          = 0;
-   neighbors_vars.neighbors[neighborIndex].stableNeighbor            = FALSE;
-   neighbors_vars.neighbors[neighborIndex].switchStabilityCounter    = 0;
-   //neighbors_vars.neighbors[neighborIndex].addr_16b.type           = ADDR_NONE; // to save RAM
-   neighbors_vars.neighbors[neighborIndex].addr_64b.type             = ADDR_NONE;
-   //neighbors_vars.neighbors[neighborIndex].addr_128b.type          = ADDR_NONE; // to save RAM
-   neighbors_vars.neighbors[neighborIndex].rank                   = DEFAULTDAGRANK;
-   neighbors_vars.neighbors[neighborIndex].rssi                      = 0;
-   neighbors_vars.neighbors[neighborIndex].numRx                     = 0;
-   neighbors_vars.neighbors[neighborIndex].numTx                     = 0;
-   neighbors_vars.neighbors[neighborIndex].numTxACK                  = 0;
-   neighbors_vars.neighbors[neighborIndex].asn.bytes0and1            = 0;
-   neighbors_vars.neighbors[neighborIndex].asn.bytes2and3            = 0;
-   neighbors_vars.neighbors[neighborIndex].asn.byte4                 = 0;
+   memset(&(neighbors_vars.neighbors[neighborIndex]),0,sizeof(neighborRow_t));
 }
 
 //=========================== helpers =========================================
