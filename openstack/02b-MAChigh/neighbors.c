@@ -587,6 +587,8 @@ void  neighbors_removeOld() {
          }
       }
    }
+   // update my routing information
+   neighbors_updateMyDAGrankAndNeighborPreference();
 }
 
 //===== debug
