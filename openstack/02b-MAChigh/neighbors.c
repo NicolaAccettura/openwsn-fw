@@ -45,9 +45,11 @@ void neighbors_init() {
    if (idmanager_getIsDAGroot()==TRUE) {
       neighbors_vars.myDODAGversion=DEFAULTDODAGVERSION;
       neighbors_vars.myRank=0;
+      neighbors_vars.myPreviousRank=0;
    } else {
       neighbors_vars.myDODAGversion=DEFAULTDODAGVERSION;
       neighbors_vars.myRank=DEFAULTDAGRANK;
+      neighbors_vars.myPreviousRank=DEFAULTDAGRANK;
    }
 }
 
@@ -478,6 +480,9 @@ void neighbors_indicateRxDIO(OpenQueueEntry_t* msg) {
          }
          neighbors_writeDODAGid(&(neighbors_vars.dio->DODAGID[0]));
          neighbors_vars.f_changedDODAGID = TRUE;
+         neighbors_vars.myDODAGversion=DEFAULTDODAGVERSION;
+         neighbors_vars.myRank=DEFAULTDAGRANK;
+         neighbors_vars.myPreviousRank=DEFAULTDAGRANK;
          neighbors_vars.neighbors[i].DODAGversion = neighbors_vars.dio->verNumb;
          neighbors_vars.neighbors[i].rank = neighbors_vars.dio->rank;
          
@@ -577,21 +582,52 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
    
    // update preferred parent
    if (prefParentRank < MAXDAGRANK) {
-      if (feasParentRank < MAXDAGRANK) {
-         //TODO
+      neighbors_vars.myDODAGversion                                  = neighbors_vars.neighbors[prefParentIdx].DODAGversion;
+      neighbors_vars.myRank                                          = prefParentRank;
+      neighbors_vars.myPreviousRank                                  = prefParentRank;
+      if (
+            (feasParentRank < neighbors_vars.myRank)
+            &&
+            (
+               neighbors_isDODAGverNumbHigher(neighbors_vars.neighbors[feasParentIdx].DODAGversion,neighbors_vars.myDODAGversion)
+               ||
+               (neighbors_vars.neighbors[feasParentIdx].DODAGversion == neighbors_vars.myDODAGversion)
+            )
+         ) {
+         neighbors_vars.myDODAGversion                                  = neighbors_vars.neighbors[feasParentIdx].DODAGversion;
+         neighbors_vars.myRank                                          = feasParentIdx;
+         neighbors_vars.myPreviousRank                                  = feasParentIdx;
+         neighbors_vars.neighbors[feasParentIdx].parentPreference       = MAXPREFERENCE;
+         neighbors_vars.neighbors[feasParentIdx].stableNeighbor         = TRUE;
+         neighbors_vars.neighbors[feasParentIdx].switchStabilityCounter = 0;
       } else {
-         neighbors_vars.myDODAGversion                                  = neighbors_vars.neighbors[prefParentIdx].DODAGversion;
-         neighbors_vars.myRank                                          = tentativeRank;
          neighbors_vars.neighbors[prefParentIdx].parentPreference       = MAXPREFERENCE;
          neighbors_vars.neighbors[prefParentIdx].stableNeighbor         = TRUE;
          neighbors_vars.neighbors[prefParentIdx].switchStabilityCounter = 0;
       }
    } else {
-      if (feasParentRank < MAXDAGRANK) {
-         //TODO
+      if (
+            (feasParentRank < MAXDAGRANK)
+            &&
+            (
+               neighbors_isDODAGverNumbHigher(neighbors_vars.neighbors[feasParentIdx].DODAGversion,neighbors_vars.myDODAGversion)
+               ||
+               (
+                  (neighbors_vars.neighbors[feasParentIdx].DODAGversion == neighbors_vars.myDODAGversion)
+                  &&
+                  (feasParentRank <= neighbors_vars.myPreviousRank)
+               )
+            )
+         ) {
+            neighbors_vars.myDODAGversion                                  = neighbors_vars.neighbors[feasParentIdx].DODAGversion;
+            neighbors_vars.myRank                                          = feasParentRank;
+            neighbors_vars.myPreviousRank                                  = feasParentRank;
+            neighbors_vars.neighbors[feasParentIdx].parentPreference       = MAXPREFERENCE;
+            neighbors_vars.neighbors[feasParentIdx].stableNeighbor         = TRUE;
+            neighbors_vars.neighbors[feasParentIdx].switchStabilityCounter = 0;
       } else {
          neighbors_vars.myRank                                          = MAXDAGRANK;
-      } 
+      }
    }
 }
 

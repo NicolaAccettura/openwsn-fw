@@ -71,6 +71,7 @@ typedef struct {
    uint8_t              myDODAGID[16];
    DODAGversion_t       myDODAGversion;
    rank_t               myRank;
+   rank_t               myPreviousRank;
    uint8_t              debugRow;
    icmpv6rpl_dio_ht*    dio; //keep it global to be able to debug correctly.
 } neighbors_vars_t;
