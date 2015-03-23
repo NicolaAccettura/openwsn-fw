@@ -41,10 +41,12 @@ void neighbors_init() {
    // clear module variables
    memset(&neighbors_vars,0,sizeof(neighbors_vars_t));
    
-   // set myDAGrank
+   // set myDODAGvesion and myRank
    if (idmanager_getIsDAGroot()==TRUE) {
+      neighbors_vars.myDODAGversion=DEFAULTDODAGVERSION;
       neighbors_vars.myRank=0;
    } else {
+      neighbors_vars.myDODAGversion=DEFAULTDODAGVERSION;
       neighbors_vars.myRank=DEFAULTDAGRANK;
    }
 }
@@ -474,11 +476,7 @@ void neighbors_indicateRxDIO(OpenQueueEntry_t* msg) {
                removeNeighbor(row);
             }
          }
-         memcpy(
-            &(neighbors_vars.myDODAGID[0]),
-            &(neighbors_vars.dio->DODAGID[0]),
-            sizeof(neighbors_vars.dio->DODAGID)
-         );
+         neighbors_writeDODAGid(&(neighbors_vars.dio->DODAGID[0]));
          neighbors_vars.f_changedDODAGID = TRUE;
          neighbors_vars.neighbors[i].DODAGversion = neighbors_vars.dio->verNumb;
          neighbors_vars.neighbors[i].rank = neighbors_vars.dio->rank;
@@ -510,6 +508,15 @@ void  neighbors_getNeighbor(open_addr_t* address, uint8_t addr_type, uint8_t ind
 
 //===== managing routing info
 
+void neighbors_writeDODAGid(uint8_t* dodagid) {
+   // write DODAGID to myDODAGID
+   memcpy(
+      &(neighbors_vars.myDODAGID[0]),
+      dodagid,
+      sizeof(neighbors_vars.myDODAGID)
+   );
+}
+
 /**
 \brief Update my DAG rank and neighbor preference.
 
@@ -521,30 +528,27 @@ routing decisions to change. Examples are:
 */
 void neighbors_updateMyDAGrankAndNeighborPreference() {
    uint8_t   i;
-   uint16_t  rankIncrease;
+   rank_t    rankIncrease;
    uint32_t  tentativeRank; // 32-bit since is used to sum
    uint8_t   prefParentIdx;
-   bool      prefParentFound;
+   uint8_t   feasParentIdx;
+   rank_t    prefParentRank;
+   rank_t    feasParentRank;
    
    // if I'm a DAGroot, my DAGrank is always 0
    if ((idmanager_getIsDAGroot())==TRUE) {
-      neighbors_vars.myRank=0;
       return;
    }
    
-   // reset my DAG rank to max value. May be lowered below.
-   neighbors_vars.myRank  = MAXDAGRANK;
-   
    // by default, I haven't found a preferred parent
-   prefParentFound           = FALSE;
-   prefParentIdx             = 0;
+   prefParentRank             = MAXDAGRANK;
+   feasParentRank             = MAXDAGRANK;
+   prefParentIdx              = MAXNUMNEIGHBORS;
+   feasParentIdx              = MAXNUMNEIGHBORS;
    
    // loop through neighbor table, update myDAGrank
    for (i=0;i<MAXNUMNEIGHBORS;i++) {
       if (neighbors_vars.neighbors[i].used==TRUE) {
-         
-         // reset parent preference
-         neighbors_vars.neighbors[i].parentPreference=0;
          
          // calculate link cost to this neighbor
          if (neighbors_vars.neighbors[i].numTxACK==0) {
@@ -553,23 +557,41 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
             //6TiSCH minimal draft using OF0 for rank computation
             rankIncrease = (uint16_t)((((float)neighbors_vars.neighbors[i].numTx)/((float)neighbors_vars.neighbors[i].numTxACK))*2*MINHOPRANKINCREASE);
          }
-         
          tentativeRank = neighbors_vars.neighbors[i].rank+rankIncrease;
-         if ( tentativeRank<neighbors_vars.myRank &&
-              tentativeRank<MAXDAGRANK) {
-            // found better parent, lower my DAGrank
-            neighbors_vars.myRank   = tentativeRank;
-            prefParentFound            = TRUE;
+         if (tentativeRank > MAXDAGRANK) {
+            tentativeRank = MAXDAGRANK;
+         }
+         
+         if (neighbors_vars.neighbors[i].parentPreference == MAXPREFERENCE) {
+            prefParentRank             = tentativeRank;
             prefParentIdx              = i;
+         } else {
+            if (tentativeRank < feasParentRank) {
+               // found feasible parent, lower feasParentRank
+               feasParentRank             = tentativeRank;
+               feasParentIdx              = i;
+            }
          }
       }
    } 
    
    // update preferred parent
-   if (prefParentFound) {
-      neighbors_vars.neighbors[prefParentIdx].parentPreference       = MAXPREFERENCE;
-      neighbors_vars.neighbors[prefParentIdx].stableNeighbor         = TRUE;
-      neighbors_vars.neighbors[prefParentIdx].switchStabilityCounter = 0;
+   if (prefParentRank < MAXDAGRANK) {
+      if (feasParentRank < MAXDAGRANK) {
+         //TODO
+      } else {
+         neighbors_vars.myDODAGversion                                  = neighbors_vars.neighbors[prefParentIdx].DODAGversion;
+         neighbors_vars.myRank                                          = tentativeRank;
+         neighbors_vars.neighbors[prefParentIdx].parentPreference       = MAXPREFERENCE;
+         neighbors_vars.neighbors[prefParentIdx].stableNeighbor         = TRUE;
+         neighbors_vars.neighbors[prefParentIdx].switchStabilityCounter = 0;
+      }
+   } else {
+      if (feasParentRank < MAXDAGRANK) {
+         //TODO
+      } else {
+         neighbors_vars.myRank                                          = MAXDAGRANK;
+      } 
    }
 }
 
@@ -639,7 +661,7 @@ void registerNewNeighbor(open_addr_t* address,
       neighbors_vars.neighbors[row].stableNeighbor         = TRUE;
       neighbors_vars.neighbors[row].switchStabilityCounter = 0;
       memcpy(&neighbors_vars.neighbors[row].addr_64b,address,sizeof(open_addr_t));
-      neighbors_vars.neighbors[row].rank                = DEFAULTDAGRANK;
+      neighbors_vars.neighbors[row].rank                   = DEFAULTDAGRANK;
       neighbors_vars.neighbors[row].rssi                   = rssi;
       neighbors_vars.neighbors[row].numRx                  = 1;
       neighbors_vars.neighbors[row].numTx                  = 0;

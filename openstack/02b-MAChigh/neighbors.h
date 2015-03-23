@@ -19,6 +19,7 @@
 #define SWITCHSTABILITYTHRESHOLD  3
 #define DEFAULTLINKCOST           15
 
+#define DEFAULTDODAGVERSION       0xf0
 #define MAXDAGRANK                0xffff
 #define DEFAULTDAGRANK            MAXDAGRANK
 #define MINHOPRANKINCREASE        256  //default value in RPL and Minimal 6TiSCH draft
@@ -111,6 +112,7 @@ void            neighbors_indicateRxDIO(OpenQueueEntry_t* msg);
 // get addresses
 void            neighbors_getNeighbor(open_addr_t* address,uint8_t addr_type,uint8_t index);
 // managing routing info
+void            neighbors_writeDODAGid(uint8_t* dodagid);
 void            neighbors_updateMyDAGrankAndNeighborPreference(void);
 // maintenance
 void            neighbors_removeOld(void);

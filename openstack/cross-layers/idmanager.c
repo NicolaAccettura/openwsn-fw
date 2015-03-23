@@ -220,6 +220,7 @@ void idmanager_triggerAboutRoot() {
    memcpy(&dodagid[0],idmanager_vars.myPrefix.prefix,8);  // prefix
    memcpy(&dodagid[8],idmanager_vars.my64bID.addr_64b,8); // eui64
    icmpv6rpl_writeDODAGid(dodagid);
+   neighbors_writeDODAGid(dodagid);
    
    return;
 }
