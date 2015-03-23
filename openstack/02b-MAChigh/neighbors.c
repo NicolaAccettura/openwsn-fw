@@ -5,6 +5,8 @@
 #include "idmanager.h"
 #include "openserial.h"
 #include "IEEE802154E.h"
+#include "opentimers.h"
+#include "scheduler.h"
 
 //=========================== variables =======================================
 
@@ -30,6 +32,9 @@ bool neighbors_isDODAGverNumbHigher(
         DODAGversion_t firstVerNumb, 
         DODAGversion_t secondVerNumb
      );
+void neighbors_timer_cleanup_cb(opentimer_id_t id);
+void neighbors_timer_cleanup_task(void);
+void neighbors_timer_cleanup_delay(void);
 
 //=========================== public ==========================================
 
@@ -50,6 +55,12 @@ void neighbors_init() {
       neighbors_vars.myDODAGversion=DEFAULTDODAGVERSION;
       neighbors_vars.myRank=DEFAULTDAGRANK;
       neighbors_vars.myPreviousRank=DEFAULTDAGRANK;
+      neighbors_vars.timerId  = opentimers_start(
+                                    2000*EBTIMEOUT,
+                                    TIMER_PERIODIC,
+                                    TIME_MS,
+                                    neighbors_timer_cleanup_cb
+                                 );
    }
 }
 
@@ -461,7 +472,6 @@ void neighbors_indicateRxDIO(OpenQueueEntry_t* msg) {
          neighbors_vars.myPreviousRank=DEFAULTDAGRANK;
          neighbors_vars.neighbors[i].DODAGversion = neighbors_vars.dio->verNumb;
          neighbors_vars.neighbors[i].rank = neighbors_vars.dio->rank;
-         
       }
    }
    // update my routing information
@@ -581,6 +591,7 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
          neighbors_vars.neighbors[prefParentIdx].stableNeighbor         = TRUE;
          neighbors_vars.neighbors[prefParentIdx].switchStabilityCounter = 0;
       }
+      neighbors_timer_cleanup_delay();
    } else {
       if (
             (feasParentRank < MAXDAGRANK)
@@ -595,12 +606,13 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
                )
             )
          ) {
-            neighbors_vars.myDODAGversion                                  = neighbors_vars.neighbors[feasParentIdx].DODAGversion;
-            neighbors_vars.myRank                                          = feasParentRank;
-            neighbors_vars.myPreviousRank                                  = feasParentRank;
-            neighbors_vars.neighbors[feasParentIdx].parentPreference       = MAXPREFERENCE;
-            neighbors_vars.neighbors[feasParentIdx].stableNeighbor         = TRUE;
-            neighbors_vars.neighbors[feasParentIdx].switchStabilityCounter = 0;
+         neighbors_vars.myDODAGversion                                  = neighbors_vars.neighbors[feasParentIdx].DODAGversion;
+         neighbors_vars.myRank                                          = feasParentRank;
+         neighbors_vars.myPreviousRank                                  = feasParentRank;
+         neighbors_vars.neighbors[feasParentIdx].parentPreference       = MAXPREFERENCE;
+         neighbors_vars.neighbors[feasParentIdx].stableNeighbor         = TRUE;
+         neighbors_vars.neighbors[feasParentIdx].switchStabilityCounter = 0;
+         neighbors_timer_cleanup_delay();
       } else {
          neighbors_vars.myRank                                          = MAXDAGRANK;
       }
@@ -728,4 +740,24 @@ bool neighbors_isSameDODAGID() {
 
 bool neighbors_isDODAGverNumbHigher(DODAGversion_t firstVerNumb, DODAGversion_t secondVerNumb) {
    return (firstVerNumb > secondVerNumb);
+}
+
+void neighbors_timer_cleanup_cb(opentimer_id_t id) {
+   scheduler_push_task(neighbors_timer_cleanup_task,TASKPRIO_RPL);
+}
+
+void neighbors_timer_cleanup_task(void) {
+   neighbors_vars.myDODAGversion=DEFAULTDODAGVERSION;
+   neighbors_vars.myRank=DEFAULTDAGRANK;
+   neighbors_vars.myPreviousRank=DEFAULTDAGRANK;
+}
+
+void neighbors_timer_cleanup_delay(void) {
+   opentimers_stop(neighbors_vars.timerId);
+   opentimers_setPeriod(
+                           neighbors_vars.timerId, 
+                           TIME_MS,
+                           2000*EBTIMEOUT
+                       );
+   opentimers_restart(neighbors_vars.timerId);
 }

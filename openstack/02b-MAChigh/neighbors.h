@@ -9,6 +9,7 @@
 */
 #include "opendefs.h"
 #include "icmpv6rpl.h"
+#include "opentimers.h"
 
 //=========================== define ==========================================
 
@@ -73,6 +74,7 @@ typedef struct {
    rank_t               myRank;
    rank_t               myPreviousRank;
    uint8_t              debugRow;
+   opentimer_id_t       timerId;
    icmpv6rpl_dio_ht*    dio; //keep it global to be able to debug correctly.
 } neighbors_vars_t;
 
