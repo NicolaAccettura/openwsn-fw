@@ -110,7 +110,7 @@ bool neighbors_getPreferredParentEui64(open_addr_t* addressToWrite) {
    minRankVal           = MAXDAGRANK;
    minRankIdx           = MAXNUMNEIGHBORS+1;
    
-   //===== step 1. Try to find preferred parent
+   // Try to find preferred parent
    for (i=0; i<MAXNUMNEIGHBORS; i++) {
       if (neighbors_vars.neighbors[i].used==TRUE){
          if (neighbors_vars.neighbors[i].parentPreference==MAXPREFERENCE) {
@@ -125,18 +125,6 @@ bool neighbors_getPreferredParentEui64(open_addr_t* addressToWrite) {
          }
          numNeighbors++;
       }
-   }
-   
-   //===== step 2. (backup) Promote neighbor with min rank to preferred parent
-   if (foundPreferred==FALSE && numNeighbors > 0){
-      // promote neighbor
-      neighbors_vars.neighbors[minRankIdx].parentPreference       = MAXPREFERENCE;
-      neighbors_vars.neighbors[minRankIdx].stableNeighbor         = TRUE;
-      neighbors_vars.neighbors[minRankIdx].switchStabilityCounter = 0;
-      // return its address
-      memcpy(addressToWrite,&(neighbors_vars.neighbors[minRankIdx].addr_64b),sizeof(open_addr_t));
-      addressToWrite->type=ADDR_64B;
-      foundPreferred=TRUE;         
    }
    
    return foundPreferred;
@@ -676,8 +664,6 @@ void registerNewNeighbor(open_addr_t* address,
                          bool         joinPrioPresent,
                          uint8_t      joinPrio) {
    uint8_t  row;
-   uint8_t  j;
-   bool     iHaveAPreferedParent;
    
    row = 0;
    while (row<MAXNUMNEIGHBORS) {
@@ -706,18 +692,6 @@ void registerNewNeighbor(open_addr_t* address,
       //update jp
       if (joinPrioPresent==TRUE){
          neighbors_vars.neighbors[row].joinPrio=joinPrio;
-      }
-      
-      // do I already have a preferred parent ? -- TODO change to use JP
-      iHaveAPreferedParent = FALSE;
-      for (j=0;j<MAXNUMNEIGHBORS;j++) {
-         if (neighbors_vars.neighbors[j].parentPreference==MAXPREFERENCE) {
-            iHaveAPreferedParent = TRUE;
-         }
-      }
-      // if I have none, and I'm not DAGroot, the new neighbor is my preferred
-      if (iHaveAPreferedParent==FALSE && idmanager_getIsDAGroot()==FALSE) {      
-         neighbors_vars.neighbors[row].parentPreference     = MAXPREFERENCE;
       }
    } else {
       openserial_printError(COMPONENT_NEIGHBORS,ERR_NEIGHBORS_FULL,
