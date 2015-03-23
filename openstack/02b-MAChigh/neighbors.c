@@ -99,16 +99,10 @@ uint8_t neighbors_getNumNeighbors() {
 bool neighbors_getPreferredParentEui64(open_addr_t* addressToWrite) {
    uint8_t   i;
    bool      foundPreferred;
-   uint8_t   numNeighbors;
-   rank_t minRankVal;
-   uint8_t   minRankIdx;
    
    addressToWrite->type = ADDR_NONE;
    
    foundPreferred       = FALSE;
-   numNeighbors         = 0;
-   minRankVal           = MAXDAGRANK;
-   minRankIdx           = MAXNUMNEIGHBORS+1;
    
    // Try to find preferred parent
    for (i=0; i<MAXNUMNEIGHBORS; i++) {
@@ -118,12 +112,6 @@ bool neighbors_getPreferredParentEui64(open_addr_t* addressToWrite) {
             addressToWrite->type=ADDR_64B;
             foundPreferred=TRUE;
          }
-         // identify neighbor with lowest rank
-         if (neighbors_vars.neighbors[i].rank < minRankVal) {
-            minRankVal=neighbors_vars.neighbors[i].rank;
-            minRankIdx=i;
-         }
-         numNeighbors++;
       }
    }
    
