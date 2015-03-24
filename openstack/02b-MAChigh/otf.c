@@ -3,6 +3,7 @@
 #include "neighbors.h"
 #include "sixtop.h"
 #include "scheduler.h"
+#include "schedule.h"
 
 //=========================== variables =======================================
 
@@ -57,4 +58,14 @@ void otf_removeCell_task(void) {
    sixtop_removeCell(
       &neighbor
    );
+}
+
+void otf_monitor_task(void) {
+   uint8_t numNeighbors;
+   uint8_t i;
+   
+   numNeighbors = neighbors_getNumNeighbors();
+   for (i=0;i<MAXNUMNEIGHBORS;i++) {
+      
+   }
 }
