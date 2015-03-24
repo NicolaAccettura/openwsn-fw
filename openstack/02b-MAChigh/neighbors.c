@@ -442,7 +442,7 @@ void neighbors_indicateRxDIO(OpenQueueEntry_t* msg) {
    neighbors_vars.dio = (icmpv6rpl_dio_ht*)(msg->payload);
    i = findNeighborRow(&(msg->l2_nextORpreviousHop));
    if (i<MAXNUMNEIGHBORS) {
-      if (neighbors_isSameDODAGID()) {
+      if (neighbors_isSameDODAGID()==TRUE) {
          
          neighbors_vars.neighbors[i].DODAGversion = neighbors_vars.dio->verNumb;
          if (
@@ -583,6 +583,7 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
          neighbors_vars.myDODAGversion                                  = neighbors_vars.neighbors[feasParentIdx].DODAGversion;
          neighbors_vars.myRank                                          = feasParentIdx;
          neighbors_vars.myPreviousRank                                  = feasParentIdx;
+         neighbors_vars.neighbors[prefParentIdx].parentPreference       = 0;
          neighbors_vars.neighbors[feasParentIdx].parentPreference       = MAXPREFERENCE;
          neighbors_vars.neighbors[feasParentIdx].stableNeighbor         = TRUE;
          neighbors_vars.neighbors[feasParentIdx].switchStabilityCounter = 0;
@@ -731,11 +732,12 @@ bool isThisRowMatching(open_addr_t* address, uint8_t rowNumber) {
 }
 
 bool neighbors_isSameDODAGID() {
-   return memcmp(
-      &(neighbors_vars.myDODAGID[0]),
-      &(neighbors_vars.dio->DODAGID[0]),
-      sizeof(neighbors_vars.dio->DODAGID)
-   );
+   bool returnVal;
+   returnVal = FALSE;
+   if (memcmp(&(neighbors_vars.myDODAGID[0]),&(neighbors_vars.dio->DODAGID[0]),sizeof(neighbors_vars.dio->DODAGID))==0) {
+      returnVal = TRUE;
+   }
+   return returnVal;
 }
 
 bool neighbors_isDODAGverNumbHigher(DODAGversion_t firstVerNumb, DODAGversion_t secondVerNumb) {
