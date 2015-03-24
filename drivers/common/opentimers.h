@@ -19,7 +19,7 @@
 //=========================== define ==========================================
 
 /// Maximum number of timers that can run concurrently
-#define MAX_NUM_TIMERS            10
+#define MAX_NUM_TIMERS            20
 
 #define MAX_TICKS_IN_SINGLE_CLOCK ((PORT_TIMER_WIDTH)0xFFFFFFFF)
 
