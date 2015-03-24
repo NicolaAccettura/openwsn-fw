@@ -7,6 +7,7 @@
 #include "IEEE802154E.h"
 #include "opentimers.h"
 #include "scheduler.h"
+#include "leds.h"
 
 //=========================== variables =======================================
 
@@ -593,6 +594,7 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
          neighbors_vars.neighbors[prefParentIdx].switchStabilityCounter = 0;
       }
       neighbors_timer_cleanup_delay();
+      leds_sync_on();
    } else {
       if (
             (feasParentRank < MAXDAGRANK)
@@ -614,8 +616,10 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
          neighbors_vars.neighbors[feasParentIdx].stableNeighbor         = TRUE;
          neighbors_vars.neighbors[feasParentIdx].switchStabilityCounter = 0;
          neighbors_timer_cleanup_delay();
+         leds_sync_on();
       } else {
          neighbors_vars.myRank                                          = MAXDAGRANK;
+         leds_sync_off();
       }
    }
 }
