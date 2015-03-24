@@ -411,21 +411,57 @@ void csensors_setPeriod(uint32_t period,
 void csensors_fillpayload(OpenQueueEntry_t* msg,
       uint8_t id) {
    
-   uint16_t              value;
-
-   value=csensors_vars.csensors_resource[id].opensensors_resource->callbackRead();
-   packetfunctions_reserveHeaderSize(msg,3);
+   uint8_t   i, sign, maxDigit, valueConvertedDec;
+   uint16_t  value;
+   uint32_t  valueConvertedInt, temp, power10;
+   float     valueConverted;
    
+   value=csensors_vars.csensors_resource[id].opensensors_resource->callbackRead();
+   if (csensors_vars.csensors_resource[id].opensensors_resource->callbackConvert == NULL) {
+      valueConverted=value;
+   } else {
+      valueConverted=csensors_vars.csensors_resource[id].opensensors_resource->callbackConvert(value);
+   }
+
+   sign = 0;
+   if (valueConverted<0) {
+      sign = 1;
+      valueConverted = -valueConverted;
+   }
+   valueConvertedInt = (uint32_t)valueConverted;
+   valueConvertedDec = (uint8_t)((valueConverted-valueConvertedInt)*100);
+   temp = valueConvertedInt;
+   maxDigit = 1;
+   power10 = 1;
+   while (temp>=10) {
+      temp /= 10;
+      power10 *= 10;
+      maxDigit++;
+   }
+
+   packetfunctions_reserveHeaderSize(msg,1+sign+maxDigit+3);
+
    // add CoAP payload
    msg->payload[0]                  = COAP_PAYLOAD_MARKER;
-   
-   // add value
-   msg->payload[1]                  = (value>>8) & 0x00ff;
-   msg->payload[2]                  = value & 0x00ff;
 
+   // add sign, in case
+   if (sign==1) {
+       msg->payload[sign]           = (uint8_t)'-';
+   }
+
+   for (i=0;i<maxDigit;i++) {
+      msg->payload[1+sign+i]              = (uint8_t)'0' + valueConvertedInt/power10;
+      valueConvertedInt -= (valueConvertedInt/power10)*power10;
+      power10 /= 10;
+   }
+
+   msg->payload[1+sign+maxDigit]           = (uint8_t)'.';
+   msg->payload[1+sign+maxDigit+1]         = (uint8_t)'0' + valueConvertedDec/10;
+   msg->payload[1+sign+maxDigit+2]         = (uint8_t)'0' + valueConvertedDec%10;
+   
+   
 
 }
-
 
 /**
 \brief The stack indicates that the packet was sent.
