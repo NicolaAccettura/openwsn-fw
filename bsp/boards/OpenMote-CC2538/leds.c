@@ -39,79 +39,79 @@ void bspLedToggle(uint8_t ui8Leds);
 //=========================== public ==========================================
 
 void leds_init() {
-    GPIOPinTypeGPIOOutput(BSP_LED_BASE, BSP_LED_ALL);
-	GPIOPinWrite(BSP_LED_BASE, BSP_LED_ALL, 0);
+   GPIOPinTypeGPIOOutput(BSP_LED_BASE, BSP_LED_ALL);
+   GPIOPinWrite(BSP_LED_BASE, BSP_LED_ALL, 0);
 }
 
 // red
 void    leds_error_on() {
-	bspLedSet(BSP_LED_1);
+   bspLedSet(BSP_LED_1);
 }
 void    leds_error_off() {
-	bspLedClear(BSP_LED_1);
+   bspLedClear(BSP_LED_1);
 }
 void    leds_error_toggle() {
-	bspLedToggle(BSP_LED_1);
+   bspLedToggle(BSP_LED_1);
 }
 uint8_t leds_error_isOn() {
-	  uint32_t ui32Toggle = GPIOPinRead(BSP_LED_BASE, BSP_LED_1);
-	  return (uint8_t)(ui32Toggle & BSP_LED_1)>>4;
+   uint32_t ui32Toggle = GPIOPinRead(BSP_LED_BASE, BSP_LED_1);
+   return (uint8_t)(ui32Toggle & BSP_LED_1)>>4;
 }
 
 // orange
 void    leds_sync_on() {
-	bspLedSet(BSP_LED_2);
+   bspLedSet(BSP_LED_2);
 }
 void    leds_sync_off() {
-	bspLedClear(BSP_LED_2);
+   bspLedClear(BSP_LED_2);
 }
 void    leds_sync_toggle() {
-	bspLedToggle(BSP_LED_2);
+   bspLedToggle(BSP_LED_2);
 }
 uint8_t leds_sync_isOn() {
-	uint32_t ui32Toggle = GPIOPinRead(BSP_LED_BASE, BSP_LED_2);
-    return (uint8_t)(ui32Toggle & BSP_LED_2)>>5;
+   uint32_t ui32Toggle = GPIOPinRead(BSP_LED_BASE, BSP_LED_2);
+   return (uint8_t)(ui32Toggle & BSP_LED_2)>>5;
 }
 
 // green
 void    leds_radio_on() {
-	bspLedSet(BSP_LED_4);
+   bspLedSet(BSP_LED_4);
 }
 void    leds_radio_off() {
-	bspLedClear(BSP_LED_4);
+   bspLedClear(BSP_LED_4);
 }
 void    leds_radio_toggle() {
-	bspLedToggle(BSP_LED_4);
+   bspLedToggle(BSP_LED_4);
 }
 uint8_t leds_radio_isOn() {
-	uint32_t ui32Toggle = GPIOPinRead(BSP_LED_BASE, BSP_LED_4);
-	return (uint8_t)(ui32Toggle & BSP_LED_4)>>7;
+   uint32_t ui32Toggle = GPIOPinRead(BSP_LED_BASE, BSP_LED_4);
+   return (uint8_t)(ui32Toggle & BSP_LED_4)>>7;
 }
 
 // yellow
 void    leds_debug_on() {
-	bspLedSet(BSP_LED_3);
+   bspLedSet(BSP_LED_3);
 }
 void    leds_debug_off() {
-	bspLedClear(BSP_LED_3);
+   bspLedClear(BSP_LED_3);
 }
 void    leds_debug_toggle() {
-	bspLedToggle(BSP_LED_3);
+   bspLedToggle(BSP_LED_3);
 }
 uint8_t leds_debug_isOn() {
-	uint32_t ui32Toggle = GPIOPinRead(BSP_LED_BASE, BSP_LED_3);
-	return (uint8_t)(ui32Toggle & BSP_LED_3)>>6;
+   uint32_t ui32Toggle = GPIOPinRead(BSP_LED_BASE, BSP_LED_3);
+   return (uint8_t)(ui32Toggle & BSP_LED_3)>>6;
 }
 
 // all
 void leds_all_on() {
-	bspLedSet(BSP_LED_ALL);
+   bspLedSet(BSP_LED_ALL);
 }
 void leds_all_off() {
-	bspLedClear(BSP_LED_ALL);
+   bspLedClear(BSP_LED_ALL);
 }
 void leds_all_toggle() {
-	bspLedToggle(BSP_LED_ALL);
+   bspLedToggle(BSP_LED_ALL);
 }
 
 void leds_error_blink() {
@@ -123,7 +123,7 @@ void leds_error_blink() {
      
    // blink error LED for ~10s
    for (i=0;i<80;i++) {
-	  bspLedToggle(BSP_LED_1);
+      bspLedToggle(BSP_LED_1);
       for (delay=0xffff;delay>0;delay--);
       for (delay=0xffff;delay>0;delay--);
    }
@@ -139,35 +139,35 @@ void leds_increment() {
 
 port_INLINE void bspLedSet(uint8_t ui8Leds)
 {
-    //
-    // Turn on specified LEDs
-    //
-    GPIOPinWrite(BSP_LED_BASE, ui8Leds, ui8Leds);
+   //
+   // Turn on specified LEDs
+   //
+   GPIOPinWrite(BSP_LED_BASE, ui8Leds, ui8Leds);
 }
 
 port_INLINE void bspLedClear(uint8_t ui8Leds)
 {
-    //
-    // Turn off specified LEDs
-    //
-    GPIOPinWrite(BSP_LED_BASE, ui8Leds, 0);
+   //
+   // Turn off specified LEDs
+   //
+   GPIOPinWrite(BSP_LED_BASE, ui8Leds, 0);
 }
 
 port_INLINE void bspLedToggle(uint8_t ui8Leds)
 {
-    //
-    // Get current pin values of selected bits
-    //
-    uint32_t ui32Toggle = GPIOPinRead(BSP_LED_BASE, ui8Leds);
+   //
+   // Get current pin values of selected bits
+   //
+   uint32_t ui32Toggle = GPIOPinRead(BSP_LED_BASE, ui8Leds);
 
-    //
-    // Invert selected bits
-    //
-    ui32Toggle = (~ui32Toggle) & ui8Leds;
+   //
+   // Invert selected bits
+   //
+   ui32Toggle = (~ui32Toggle) & ui8Leds;
 
-    //
-    // Set GPIO
-    //
-    GPIOPinWrite(BSP_LED_BASE, ui8Leds, ui32Toggle);
+   //
+   // Set GPIO
+   //
+   GPIOPinWrite(BSP_LED_BASE, ui8Leds, ui32Toggle);
 }
 
