@@ -52,6 +52,7 @@ void neighbors_init() {
       neighbors_vars.myDODAGversion=DEFAULTDODAGVERSION;
       neighbors_vars.myRank=0;
       neighbors_vars.myPreviousRank=0;
+      leds_sync_on();
    } else {
       neighbors_vars.myDODAGversion=DEFAULTDODAGVERSION;
       neighbors_vars.myRank=DEFAULTDAGRANK;
@@ -532,6 +533,7 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
       neighbors_vars.myDODAGversion=DEFAULTDODAGVERSION;
       neighbors_vars.myRank=0;
       neighbors_vars.myPreviousRank=0;
+      leds_sync_on();
       return;
    }
    
