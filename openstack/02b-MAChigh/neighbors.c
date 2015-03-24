@@ -529,6 +529,9 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
    
    // if I'm a DAGroot, my DAGrank is always 0
    if ((idmanager_getIsDAGroot())==TRUE) {
+      neighbors_vars.myDODAGversion=DEFAULTDODAGVERSION;
+      neighbors_vars.myRank=0;
+      neighbors_vars.myPreviousRank=0;
       return;
    }
    
