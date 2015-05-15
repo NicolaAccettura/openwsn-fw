@@ -24,7 +24,6 @@ void schedule_resetEntry(scheduleEntry_t* pScheduleEntry);
 \post Call this function before calling any other function in this module.
 */
 void schedule_init() {
-   slotOffset_t    start_slotOffset;
    slotOffset_t    i;
    open_addr_t     temp_neighbor;
    
@@ -36,6 +35,10 @@ void schedule_init() {
    schedule_vars.backoffExponent  = MINBE-1;
    schedule_vars.maxActiveSlots   = MAXACTIVESLOTS;
    
+   schedule_setFrameLength(SUPERFRAME_LENGTH);
+   schedule_setFrameHandle(SCHEDULE_MINIMAL_6TISCH_DEFAULT_SLOTFRAME_HANDLE);
+   schedule_setFrameNumber(SCHEDULE_MINIMAL_6TISCH_DEFAULT_SLOTFRAME_NUMBER);
+
    // schedule TXRX slot
    memset(&temp_neighbor,0,sizeof(temp_neighbor));
    temp_neighbor.type             = ADDR_ANYCAST;
@@ -56,24 +59,6 @@ void schedule_init() {
       0,                                    // channel offset
       &temp_neighbor                        // neighbor
    );
-   
-   // start the DAGroot, if applicable
-   if (idmanager_getIsDAGroot()==TRUE) {
-      schedule_startDAGroot();
-   }
-}
-
-/**
-\brief Starting the DAGroot schedule propagation.
-*/
-void schedule_startDAGroot() {
-   slotOffset_t    running_slotOffset;
-   open_addr_t     temp_neighbor;
-   
-   // set frame length, handle and number
-   schedule_setFrameLength(SUPERFRAME_LENGTH);
-   schedule_setFrameHandle(SCHEDULE_MINIMAL_6TISCH_DEFAULT_SLOTFRAME_HANDLE);
-   schedule_setFrameNumber(SCHEDULE_MINIMAL_6TISCH_DEFAULT_SLOTFRAME_NUMBER);
 }
 
 /**
@@ -165,8 +150,8 @@ void schedule_setFrameLength(frameLength_t newFrameLength) {
    DISABLE_INTERRUPTS();
    
    schedule_vars.frameLength = newFrameLength;
-   if (newFrameLength <= MAXACTIVESLOTS) {
-      schedule_vars.maxActiveSlots = newFrameLength;
+   if (newFrameLength <= MAXACTIVESLOTS-1+NUMSERIALRX) {
+      schedule_vars.maxActiveSlots = newFrameLength+1-NUMSERIALRX;
    }
    ENABLE_INTERRUPTS();
 }
