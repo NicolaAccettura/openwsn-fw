@@ -88,7 +88,6 @@ port_INLINE uint8_t processIE_prependSyncIE(OpenQueueEntry_t* pkt){
 port_INLINE uint8_t processIE_prependSlotframeLinkIE(OpenQueueEntry_t* pkt){
    mlme_IE_ht        mlme_subHeader;
    uint8_t           len;
-   slotOffset_t      slotOffset;
    frameLength_t     frameLength;
    
    len            = 0;
@@ -367,16 +366,10 @@ port_INLINE void processIE_retrieveSlotframeLinkIE(
       uint8_t*          ptr
    ){
    
-   schedule_setFrameLength(SUPERFRAME_LENGTH);
-   
-   /*
    uint8_t              numSlotFrames;
    uint8_t              i;
-   uint8_t              j;
    uint8_t              localptr;
-   slotframeLink_IE_ht  sfInfo; 
-   cellInfo_ht          linkInfo;
-   open_addr_t          temp_neighbor;
+   slotframeLink_IE_ht  sfInfo;
    frameLength_t        oldFrameLength;
    
    localptr = *ptr; 
@@ -384,70 +377,20 @@ port_INLINE void processIE_retrieveSlotframeLinkIE(
    // number of slot frames 1B
    numSlotFrames = *((uint8_t*)(pkt->payload)+localptr);
    localptr++;
-   
-   schedule_setFrameNumber(numSlotFrames);
 
-   // for each slotframe
-   i=0;
-   while(i < numSlotFrames){
+   for(i=0;i<numSlotFrames;i++) {
       
-      // [1B] slotftramehandle 1B
-      sfInfo.slotframehandle =*((uint8_t*)(pkt->payload)+localptr);
-      localptr++;
-      
-      schedule_setFrameHandle(sfInfo.slotframehandle);
-      
-      // [2B] slotframe size
-      sfInfo.slotframesize   = *((uint8_t*)(pkt->payload)+localptr);
-      localptr++;
-      sfInfo.slotframesize  |= (*((uint8_t*)(pkt->payload)+localptr))<<8;
-      localptr++;;
-      
-      oldFrameLength = schedule_getFrameLength();
-      schedule_setFrameLength(sfInfo.slotframesize);
-      
-      // [1B] number of links
-      sfInfo.numlinks        = *((uint8_t*)(pkt->payload)+localptr);
-      localptr++;
-      
-      if (oldFrameLength == 0) {
-         
-         for (j=0;j<sfInfo.numlinks;j++){
-            
-            // [2B] TimeSlot
-            linkInfo.tsNum = *((uint8_t*)(pkt->payload)+localptr);
-            localptr++;
-            linkInfo.tsNum  |= (*((uint8_t*)(pkt->payload)+localptr))<<8;
-            localptr++;
-            
-            // [2B] Ch.Offset
-            linkInfo.choffset = *((uint8_t*)(pkt->payload)+localptr);
-            localptr++;
-            linkInfo.choffset  |= (*((uint8_t*)(pkt->payload)+localptr))<<8;
-            localptr++;
-            
-            // [1B] LinkOption bitmap
-            linkInfo.linkoptions = *((uint8_t*)(pkt->payload)+localptr);
-            localptr++;
-            
-            // shared TXRX anycast slot(s)
-            memset(&temp_neighbor,0,sizeof(temp_neighbor));
-            temp_neighbor.type             = ADDR_ANYCAST;
-            schedule_addActiveSlot(
-               linkInfo.tsNum,                     // slot offset
-               CELLTYPE_TXRX,                      // type of slot
-               TRUE,                               // shared?
-               linkInfo.choffset,                  // channel offset
-               &temp_neighbor                      // neighbor
-            );
+      sfInfo = *(slotframeLink_IE_ht*)((uint8_t*)(pkt->payload)+localptr);
+      if (sfInfo.slotframehandle == SCHEDULE_MINIMAL_6TISCH_DEFAULT_SLOTFRAME_HANDLE) {
+         oldFrameLength = schedule_getFrameLength();
+         if (sfInfo.slotframesize != oldFrameLength) {
+             schedule_setFrameLength(sfInfo.slotframesize);
          }
       }
-      i++;
-      break; //TODO: this break is put since a single slotframe is managed
+      localptr += sizeof(slotframeLink_IE_ht) + sizeof(cellInfo_ht) * sfInfo.numlinks;
    }
    
    *ptr=localptr;
-   */
 } 
 
 port_INLINE void processIE_retrieveOpcodeIE(
