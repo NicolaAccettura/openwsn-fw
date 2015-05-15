@@ -17,7 +17,7 @@
 
 The superframe repears over time and can be arbitrarly long.
 */
-#define SUPERFRAME_LENGTH    5 //should be 101
+#define SUPERFRAME_LENGTH    5
 
 //draft-ietf-6tisch-minimal-06
 #define SCHEDULE_MINIMAL_6TISCH_DEFAULT_SLOTFRAME_HANDLE   1 // id of slotframe
@@ -129,7 +129,6 @@ typedef struct {
 
 // admin
 void               schedule_init(void);
-void               schedule_startDAGroot(void);
 bool               debugPrint_schedule(void);
 bool               debugPrint_backoff(void);
 
