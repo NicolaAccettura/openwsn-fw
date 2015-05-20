@@ -44,7 +44,6 @@ void icmpv6rpl_init() {
    //=== admin
    
    icmpv6rpl_vars.busySending               = FALSE;
-   icmpv6rpl_vars.fDodagidWritten           = 0;
    
    //=== DIO
    
@@ -140,9 +139,7 @@ void  icmpv6rpl_writeDODAGid(uint8_t* dodagid) {
       dodagid,
       sizeof(icmpv6rpl_vars.dao.DODAGID)
    );
-   
-   // remember I got a DODAGID
-   icmpv6rpl_vars.fDodagidWritten = 1;
+
 }
 
 uint8_t icmpv6rpl_getRPLIntanceID(){
@@ -464,7 +461,7 @@ void sendDAO() {
    
    //===== fill in packet
    
-   //NOTE: limit to preferrred parent only the number of DAO transit addresses to send
+   //NOTE: limit to preferred parent only the number of DAO transit addresses to send
    
    //=== transit option -- from RFC 6550, page 55 - 1 transit information header per parent is required. 
    //getting only preferred parent as transit
