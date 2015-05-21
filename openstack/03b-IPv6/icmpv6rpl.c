@@ -48,7 +48,7 @@ void icmpv6rpl_init() {
    //=== DIO
    
    icmpv6rpl_vars.dio.rplinstanceId         = 0x00;        ///< TODO: put correct value
-   icmpv6rpl_vars.dio.verNumb               = 0x00;        ///< TODO: put correct value
+   icmpv6rpl_vars.dio.verNumb               = DEFAULTDODAGVERSION;
    // rank: to be populated upon TX
    icmpv6rpl_vars.dio.rplOptions            = MOP_DIO_A | \
                                               MOP_DIO_B | \
