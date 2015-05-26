@@ -565,19 +565,56 @@ void registerNewNeighbor(open_addr_t* address,
                          asn_t*       asnTimestamp,
                          bool         joinPrioPresent,
                          uint8_t      joinPrio) {
-   uint8_t  row;
+   uint8_t   row;
+   uint8_t   i;
+   bool      f_isUsedRow;
+   bool      f_isUnstableNeighborAvailable;
+   dagrank_t maxDAGrank;
    uint8_t  j;
    bool     iHaveAPreferedParent;
    
-   row = 0;
-   while (row<MAXNUMNEIGHBORS) {
-      if (neighbors_vars.neighbors[row].used==FALSE) {
+   row = MAXNUMNEIGHBORS;
+   f_isUsedRow = TRUE;
+   f_isUnstableNeighborAvailable = FALSE;
+   maxDAGrank = 0;
+   for (i=0;i<MAXNUMNEIGHBORS;i++) {
+      if (neighbors_vars.neighbors[i].used == FALSE) {
+         row = i;
+         f_isUsedRow = FALSE;
          break;
+      } else {
+         if (neighbors_vars.neighbors[i].stableNeighbor == FALSE) {
+            if (f_isUnstableNeighborAvailable == FALSE) {
+               f_isUnstableNeighborAvailable = TRUE;
+               maxDAGrank = 0;
+            }
+            if (
+               (neighbors_vars.neighbors[i].DAGrank>maxDAGrank)
+               ||
+               (maxDAGrank == 0)
+            ) {
+               row = i;
+               maxDAGrank = neighbors_vars.neighbors[i].DAGrank;
+            }
+         } else {
+            if (f_isUnstableNeighborAvailable == FALSE) {
+               if (
+                  (neighbors_vars.neighbors[i].DAGrank > neighbors_vars.myDAGrank)
+                  &&
+                  (neighbors_vars.neighbors[i].DAGrank > maxDAGrank)
+               ) {
+                  row = i;
+                  maxDAGrank = neighbors_vars.neighbors[i].DAGrank;
+               }
+            }
+         }
       }
-      row++;
    }
    
    if (row<MAXNUMNEIGHBORS) {
+      if (f_isUsedRow) {
+         removeNeighbor(row);
+      }
       
       // add this neighbor
       neighbors_vars.neighbors[row].used                   = TRUE;

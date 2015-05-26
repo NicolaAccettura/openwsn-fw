@@ -10,7 +10,10 @@ Import('env')
 
 # directory where we put object and linked files
 # WARNING: -c (clean) removes the VARDIR, so it cannot be blank
-env['VARDIR']  = os.path.join('#','build','{0}_{1}'.format(env['board'],env['toolchain']))
+build_dir = '{0}_{1}'.format(env['board'],env['toolchain'])
+if env['dagroot']==1:
+    build_dir += '_dagroot'
+env['VARDIR']  = os.path.join('#','build',build_dir)
 
 # common include paths
 if env['board']!='python':

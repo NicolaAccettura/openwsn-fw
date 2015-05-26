@@ -12,8 +12,8 @@
 
 //=========================== define ==========================================
 
-#define TIMER_DIO_TIMEOUT         1700
-#define TIMER_DAO_TIMEOUT         10000
+#define TIMER_DIO_TIMEOUT         5872
+#define TIMER_DAO_TIMEOUT         9872
 
 #define DEFAULTDODAGVERSION       0xf0
 #define MOP_DIO_A                 1<<5
