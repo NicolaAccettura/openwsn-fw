@@ -51,14 +51,14 @@ void schedule_init() {
    );
    
    // schedule serialRX slot
-   memset(&temp_neighbor,0,sizeof(temp_neighbor));
+   /*memset(&temp_neighbor,0,sizeof(temp_neighbor));
    schedule_addActiveSlot(
       1,                                    // slot offset
       CELLTYPE_SERIALRX,                    // type of slot
       FALSE,                                // shared?
       0,                                    // channel offset
       &temp_neighbor                        // neighbor
-   );
+   );*/
 }
 
 /**
