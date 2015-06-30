@@ -51,14 +51,16 @@ void schedule_init() {
    );
    
    // schedule serialRX slot
-   /*memset(&temp_neighbor,0,sizeof(temp_neighbor));
-   schedule_addActiveSlot(
-      1,                                    // slot offset
-      CELLTYPE_SERIALRX,                    // type of slot
-      FALSE,                                // shared?
-      0,                                    // channel offset
-      &temp_neighbor                        // neighbor
-   );*/
+   if (NUMSERIALRX != 0) {
+      memset(&temp_neighbor,0,sizeof(temp_neighbor));
+      schedule_addActiveSlot(
+         1,                                    // slot offset
+         CELLTYPE_SERIALRX,                    // type of slot
+         FALSE,                                // shared?
+         0,                                    // channel offset
+         &temp_neighbor                        // neighbor
+      );
+   }
 }
 
 /**
@@ -150,8 +152,14 @@ void schedule_setFrameLength(frameLength_t newFrameLength) {
    DISABLE_INTERRUPTS();
    
    schedule_vars.frameLength = newFrameLength;
-   if (newFrameLength <= MAXACTIVESLOTS-1+NUMSERIALRX) {
-      schedule_vars.maxActiveSlots = newFrameLength+1-NUMSERIALRX;
+   if (NUMSERIALRX != 0) {
+      if (newFrameLength <= MAXACTIVESLOTS-1+NUMSERIALRX) {
+         schedule_vars.maxActiveSlots = newFrameLength+1-NUMSERIALRX;
+      }
+   } else {
+      if (newFrameLength <= MAXACTIVESLOTS) {
+         schedule_vars.maxActiveSlots = newFrameLength;
+      }
    }
    ENABLE_INTERRUPTS();
 }

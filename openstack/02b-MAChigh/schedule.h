@@ -15,7 +15,7 @@
 /**
 \brief The length of the superframe, in slots.
 
-The superframe repears over time and can be arbitrarly long.
+The superframe repeats over time and can be arbitrarly long.
 */
 #define SUPERFRAME_LENGTH    2
 
@@ -23,7 +23,7 @@ The superframe repears over time and can be arbitrarly long.
 #define SCHEDULE_MINIMAL_6TISCH_DEFAULT_SLOTFRAME_HANDLE   1 // id of slotframe
 #define SCHEDULE_MINIMAL_6TISCH_DEFAULT_SLOTFRAME_NUMBER   1 // 1 slotframe by default.
 
-#define NUMSERIALRX          3
+#define NUMSERIALRX          0
 #define NUMOTFSLOTS          0
 
 /**
@@ -36,7 +36,11 @@ in that table; a slot is "active" when it is not of type CELLTYPE_OFF.
 Set this number to the exact number of active slots you are planning on having
 in your schedule, so not to waste RAM.
 */
+#if NUMSERIALRX == 0
+#define MAXACTIVESLOTS       (1+NUMOTFSLOTS)
+#else
 #define MAXACTIVESLOTS       (1+1+NUMOTFSLOTS)
+#endif
 
 /**
 \brief Minimum backoff exponent.
