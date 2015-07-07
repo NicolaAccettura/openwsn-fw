@@ -50,6 +50,8 @@ def main():
         mote_ip_trailer = raw_input('Enter last 2 bytes of IPv6 address > ')
         if not mote_ip_trailer:
             mote_ip = MOTE_IP + '90e7'
+        else:
+            mote_ip = MOTE_IP + mote_ip_trailer
         print 'Press a value among the following:'
         print 'c --> cpu temperature sensor'
         print 't --> temperature sensor'
