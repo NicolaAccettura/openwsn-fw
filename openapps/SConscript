@@ -12,6 +12,7 @@ defaultApps   = [
     'cinfo',
     'cleds',
     'cwellknown',
+    'csensors',
     'techo',
     'uecho',
     'uinject',
