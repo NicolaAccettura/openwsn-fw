@@ -412,9 +412,11 @@ The fields which are updated are:
 
 \param[in] msg The received message with msg->payload pointing to the DIO
    header.
+\param[in] newDODAGID Bool value passed by reference and modified if
 */
-void neighbors_indicateRxDIO(OpenQueueEntry_t* msg) {
+void neighbors_indicateRxDIO(OpenQueueEntry_t* msg, bool* newDODAGID) {
    uint8_t          i;
+   uint8_t          j;
    uint8_t          temp_8b;
   
    // take ownership over the packet
@@ -427,18 +429,28 @@ void neighbors_indicateRxDIO(OpenQueueEntry_t* msg) {
    neighbors_vars.dio->rank = (temp_8b << 8) + *(msg->payload+3);
    i = findNeighborRow(&(msg->l2_nextORpreviousHop));
    if (i<MAXNUMNEIGHBORS) {
-      if (
-            neighbors_vars.dio->rank > neighbors_vars.neighbors[i].DAGrank &&
-            neighbors_vars.dio->rank - neighbors_vars.neighbors[i].DAGrank >(DEFAULTLINKCOST*2*MINHOPRANKINCREASE)
-         ) {
-         // the new DAGrank looks suspiciously high, only increment a bit
-         neighbors_vars.neighbors[i].DAGrank += (DEFAULTLINKCOST*2*MINHOPRANKINCREASE);
-         openserial_printError(COMPONENT_NEIGHBORS,ERR_LARGE_DAGRANK,
-                               (errorparameter_t)neighbors_vars.dio->rank,
-                               (errorparameter_t)neighbors_vars.neighbors[i].DAGrank);
+      if (*newDODAGID == FALSE) {
+         if (
+               neighbors_vars.dio->rank > neighbors_vars.neighbors[i].DAGrank &&
+               neighbors_vars.dio->rank - neighbors_vars.neighbors[i].DAGrank >(DEFAULTLINKCOST*2*MINHOPRANKINCREASE)
+            ) {
+            // the new DAGrank looks suspiciously high, only increment a bit
+            neighbors_vars.neighbors[i].DAGrank += (DEFAULTLINKCOST*2*MINHOPRANKINCREASE);
+            openserial_printError(COMPONENT_NEIGHBORS,ERR_LARGE_DAGRANK,
+                                  (errorparameter_t)neighbors_vars.dio->rank,
+                                  (errorparameter_t)neighbors_vars.neighbors[i].DAGrank);
+         } else {
+            neighbors_vars.neighbors[i].DAGrank = neighbors_vars.dio->rank;
+         }
       } else {
+         for (j=0;((j<MAXNUMNEIGHBORS) && (j != i));j++) {
+            removeNeighbor(j);
+         }
+         neighbors_vars.myDAGrank = DEFAULTDAGRANK;
          neighbors_vars.neighbors[i].DAGrank = neighbors_vars.dio->rank;
       }
+   } else {
+      *newDODAGID = FALSE;
    }
    // update my routing information
    neighbors_updateMyDAGrankAndNeighborPreference(); 

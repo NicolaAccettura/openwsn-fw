@@ -101,7 +101,7 @@ void          neighbors_indicateTx(
    bool                 was_finally_acked,
    asn_t*               asnTimestamp
 );
-void          neighbors_indicateRxDIO(OpenQueueEntry_t* msg);
+void          neighbors_indicateRxDIO(OpenQueueEntry_t* msg, bool* newDODAGID);
 
 // get addresses
 void          neighbors_getNeighbor(open_addr_t* address,uint8_t addr_type,uint8_t index);

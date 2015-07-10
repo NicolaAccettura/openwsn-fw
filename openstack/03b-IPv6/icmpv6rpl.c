@@ -186,6 +186,7 @@ void icmpv6rpl_sendDone(OpenQueueEntry_t* msg, owerror_t error) {
 void icmpv6rpl_receive(OpenQueueEntry_t* msg) {
    uint8_t      icmpv6code;
    open_addr_t  myPrefix;
+   bool         f_newDODAGID;
    
    // take ownership
    msg->owner      = COMPONENT_ICMPv6RPL;
@@ -205,21 +206,29 @@ void icmpv6rpl_receive(OpenQueueEntry_t* msg) {
             break; // break, don't return
          }
          
+         // register whether the DIO owns a new DODAGID
+         f_newDODAGID = (memcmp(
+            &(((icmpv6rpl_dio_ht*)(msg->payload))->DODAGID[0]),
+            &(icmpv6rpl_vars.dio.DODAGID[0]),
+            sizeof(icmpv6rpl_vars.dio.DODAGID)
+            )!=0);
+         
          // update neighbor table
-         neighbors_indicateRxDIO(msg);
+         neighbors_indicateRxDIO(msg,&f_newDODAGID);
          
-         // write DODAGID in DIO and DAO
-         icmpv6rpl_writeDODAGid(&(((icmpv6rpl_dio_ht*)(msg->payload))->DODAGID[0]));
-         
-         // update my prefix
-         myPrefix.type = ADDR_PREFIX;
-         memcpy(
-            myPrefix.prefix,
-            &((icmpv6rpl_dio_ht*)(msg->payload))->DODAGID[0],
-            sizeof(myPrefix.prefix)
-         );
-         idmanager_setMyID(&myPrefix);
-         
+         if (f_newDODAGID) {
+            // write DODAGID in DIO and DAO
+            icmpv6rpl_writeDODAGid(&(((icmpv6rpl_dio_ht*)(msg->payload))->DODAGID[0]));
+            
+            // update my prefix
+            myPrefix.type = ADDR_PREFIX;
+            memcpy(
+               myPrefix.prefix,
+               &((icmpv6rpl_dio_ht*)(msg->payload))->DODAGID[0],
+               sizeof(myPrefix.prefix)
+            );
+            idmanager_setMyID(&myPrefix);
+         }
          break;
       
       case IANA_ICMPv6_RPL_DAO:
