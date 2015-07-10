@@ -5,6 +5,8 @@
 #include "idmanager.h"
 #include "openserial.h"
 #include "IEEE802154E.h"
+#include "opentimers.h"
+#include "scheduler.h"
 
 //=========================== variables =======================================
 
@@ -25,6 +27,9 @@ bool isThisRowMatching(
         open_addr_t* address,
         uint8_t      rowNumber
      );
+void neighbors_timer_cleanup_cb(opentimer_id_t id);
+void neighbors_timer_cleanup_task(void);
+void neighbors_timer_cleanup_update(bool shouldRestart);
 
 //=========================== public ==========================================
 
@@ -35,12 +40,19 @@ void neighbors_init() {
    
    // clear module variables
    memset(&neighbors_vars,0,sizeof(neighbors_vars_t));
+   neighbors_vars.cleanupDelay = (uint32_t)DESYNCTIMEOUT * PORT_TsSlotDuration * 2;
    
    // set myDAGrank
    if (idmanager_getIsDAGroot()==TRUE) {
       neighbors_vars.myDAGrank=MINHOPRANKINCREASE;
    } else {
       neighbors_vars.myDAGrank=DEFAULTDAGRANK;
+      neighbors_vars.timerId  = opentimers_start(
+                                    neighbors_vars.cleanupDelay,
+                                    TIMER_PERIODIC,
+                                    TIME_TICS,
+                                    neighbors_timer_cleanup_cb
+                                 );
    }
    neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
 }
@@ -496,6 +508,7 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
        // the dagrank is not set through setting command, set rank to MINHOPRANKINCREASE here 
        neighbors_vars.myDAGrank=MINHOPRANKINCREASE;
        neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
+       neighbors_timer_cleanup_update(FALSE);
        return;
    }
    
@@ -571,6 +584,7 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
       neighbors_vars.neighbors[prefParentIdx].switchStabilityCounter    = 0;
       neighbors_vars.myDAGrank                                          = prefParentDAGrank;
       neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
+      neighbors_timer_cleanup_update(TRUE);
    } else {
       neighbors_vars.myDAGrank                                          = DEFAULTDAGRANK;
    }
@@ -589,7 +603,9 @@ void  neighbors_removeOld() {
             removeNeighbor(i);
          }
       }
-   } 
+   }
+   // update my routing information
+   neighbors_updateMyDAGrankAndNeighborPreference();
 }
 
 //===== debug
@@ -726,5 +742,26 @@ bool isThisRowMatching(open_addr_t* address, uint8_t rowNumber) {
                                (errorparameter_t)address->type,
                                (errorparameter_t)3);
          return FALSE;
+   }
+}
+
+
+void neighbors_timer_cleanup_cb(opentimer_id_t id) {
+   scheduler_push_task(neighbors_timer_cleanup_task,TASKPRIO_RPL);
+}
+
+void neighbors_timer_cleanup_task(void) {
+   neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
+}
+
+void neighbors_timer_cleanup_update(bool shouldRestart) {
+   opentimers_stop(neighbors_vars.timerId);
+   if (shouldRestart == TRUE) {
+      opentimers_setPeriod(
+                              neighbors_vars.timerId, 
+                              TIME_TICS,
+                              neighbors_vars.cleanupDelay
+                          );
+      opentimers_restart(neighbors_vars.timerId);
    }
 }
