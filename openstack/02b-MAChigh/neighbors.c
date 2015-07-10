@@ -42,6 +42,7 @@ void neighbors_init() {
    } else {
       neighbors_vars.myDAGrank=DEFAULTDAGRANK;
    }
+   neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
 }
 
 //===== getters
@@ -53,6 +54,15 @@ void neighbors_init() {
 */
 dagrank_t neighbors_getMyDAGrank() {
    return neighbors_vars.myDAGrank;
+}
+
+/**
+\brief Retrieve this mote's current DAG rank.
+
+\returns This mote's current DAG rank.
+*/
+dagrank_t neighbors_getMyPreviousDAGrank() {
+   return neighbors_vars.myPreviousDAGrank;
 }
 
 /**
@@ -81,44 +91,21 @@ uint8_t neighbors_getNumNeighbors() {
 bool neighbors_getPreferredParentEui64(open_addr_t* addressToWrite) {
    uint8_t   i;
    bool      foundPreferred;
-   uint8_t   numNeighbors;
-   dagrank_t minRankVal;
-   uint8_t   minRankIdx;
    
    addressToWrite->type = ADDR_NONE;
    
    foundPreferred       = FALSE;
-   numNeighbors         = 0;
-   minRankVal           = MAXDAGRANK;
-   minRankIdx           = MAXNUMNEIGHBORS+1;
    
-   //===== step 1. Try to find preferred parent
+   // Try to find preferred parent
    for (i=0; i<MAXNUMNEIGHBORS; i++) {
       if (neighbors_vars.neighbors[i].used==TRUE){
          if (neighbors_vars.neighbors[i].parentPreference==MAXPREFERENCE) {
             memcpy(addressToWrite,&(neighbors_vars.neighbors[i].addr_64b),sizeof(open_addr_t));
             addressToWrite->type=ADDR_64B;
             foundPreferred=TRUE;
+            break;
          }
-         // identify neighbor with lowest rank
-         if (neighbors_vars.neighbors[i].DAGrank < minRankVal) {
-            minRankVal=neighbors_vars.neighbors[i].DAGrank;
-            minRankIdx=i;
-         }
-         numNeighbors++;
       }
-   }
-   
-   //===== step 2. (backup) Promote neighbor with min rank to preferred parent
-   if (foundPreferred==FALSE && numNeighbors > 0){
-      // promote neighbor
-      neighbors_vars.neighbors[minRankIdx].parentPreference       = MAXPREFERENCE;
-      neighbors_vars.neighbors[minRankIdx].stableNeighbor         = TRUE;
-      neighbors_vars.neighbors[minRankIdx].switchStabilityCounter = 0;
-      // return its address
-      memcpy(addressToWrite,&(neighbors_vars.neighbors[minRankIdx].addr_64b),sizeof(open_addr_t));
-      addressToWrite->type=ADDR_64B;
-      foundPreferred=TRUE;         
    }
    
    return foundPreferred;
@@ -431,6 +418,7 @@ void neighbors_indicateRxDIO(OpenQueueEntry_t* msg, bool* newDODAGID) {
    if (i<MAXNUMNEIGHBORS) {
       if (*newDODAGID == FALSE) {
          if (
+               neighbors_vars.dio->rank != DEFAULTDAGRANK &&
                neighbors_vars.dio->rank > neighbors_vars.neighbors[i].DAGrank &&
                neighbors_vars.dio->rank - neighbors_vars.neighbors[i].DAGrank >(DEFAULTLINKCOST*2*MINHOPRANKINCREASE)
             ) {
@@ -447,6 +435,7 @@ void neighbors_indicateRxDIO(OpenQueueEntry_t* msg, bool* newDODAGID) {
             removeNeighbor(j);
          }
          neighbors_vars.myDAGrank = DEFAULTDAGRANK;
+         neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
          neighbors_vars.neighbors[i].DAGrank = neighbors_vars.dio->rank;
       }
    } else {
@@ -493,33 +482,32 @@ routing decisions to change. Examples are:
 - I became a DAGroot, so my DAGrank should be 0.
 */
 void neighbors_updateMyDAGrankAndNeighborPreference() {
-   uint8_t   i;
-   uint16_t  rankIncrease;
-   uint32_t  tentativeDAGrank; // 32-bit since is used to sum
-   uint8_t   prefParentIdx;
-   bool      prefParentFound;
+   uint8_t     i;
+   dagrank_t   rankIncrease;
+   uint32_t    tentativeDAGrank; // 32-bit since is used to sum
+   uint8_t     prefParentIdx;
+   uint8_t     feasParentIdx;
+   dagrank_t   prefParentDAGrank;
+   dagrank_t   feasParentDAGrank;
    uint32_t  rankIncreaseIntermediary; // stores intermediary results of rankIncrease calculation
    
    // if I'm a DAGroot, my DAGrank is always MINHOPRANKINCREASE
    if ((idmanager_getIsDAGroot())==TRUE) {
        // the dagrank is not set through setting command, set rank to MINHOPRANKINCREASE here 
        neighbors_vars.myDAGrank=MINHOPRANKINCREASE;
+       neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
        return;
    }
    
-   // reset my DAG rank to max value. May be lowered below.
-   neighbors_vars.myDAGrank  = MAXDAGRANK;
-   
    // by default, I haven't found a preferred parent
-   prefParentFound           = FALSE;
-   prefParentIdx             = 0;
+   prefParentDAGrank    = MAXDAGRANK;
+   feasParentDAGrank    = MAXDAGRANK;
+   prefParentIdx        = MAXNUMNEIGHBORS;
+   feasParentIdx        = MAXNUMNEIGHBORS;
    
-   // loop through neighbor table, update myDAGrank
+   // loop through neighbor table, find current preferred parent and feasible successor
    for (i=0;i<MAXNUMNEIGHBORS;i++) {
       if (neighbors_vars.neighbors[i].used==TRUE) {
-         
-         // reset parent preference
-         neighbors_vars.neighbors[i].parentPreference=0;
          
          // calculate link cost to this neighbor
          if (neighbors_vars.neighbors[i].numTxACK==0) {
@@ -532,21 +520,59 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
          }
          
          tentativeDAGrank = neighbors_vars.neighbors[i].DAGrank+rankIncrease;
-         if ( tentativeDAGrank<neighbors_vars.myDAGrank &&
-              tentativeDAGrank<MAXDAGRANK) {
-            // found better parent, lower my DAGrank
-            neighbors_vars.myDAGrank   = tentativeDAGrank;
-            prefParentFound            = TRUE;
+         if (tentativeDAGrank > MAXDAGRANK) {
+            tentativeDAGrank = MAXDAGRANK;
+         }
+         
+         if (neighbors_vars.neighbors[i].parentPreference == MAXPREFERENCE) {
+            prefParentDAGrank          = tentativeDAGrank;
             prefParentIdx              = i;
+         } else {
+            if (tentativeDAGrank < feasParentDAGrank) {
+               // found feasible parent, lower feasParentDAGrank
+               feasParentDAGrank       = tentativeDAGrank;
+               feasParentIdx           = i;
+            }
          }
       }
    } 
    
-   // update preferred parent
-   if (prefParentFound) {
-      neighbors_vars.neighbors[prefParentIdx].parentPreference       = MAXPREFERENCE;
-      neighbors_vars.neighbors[prefParentIdx].stableNeighbor         = TRUE;
-      neighbors_vars.neighbors[prefParentIdx].switchStabilityCounter = 0;
+   // discard preferred parent if its DAGrak is equal to MAXDAGRANK or higher than
+   // the feasible successor's one
+   if (
+         (prefParentIdx != MAXNUMNEIGHBORS) 
+         && 
+         ((prefParentDAGrank == MAXDAGRANK) || (prefParentDAGrank > feasParentDAGrank))
+      ) {
+      neighbors_vars.neighbors[prefParentIdx].parentPreference          = 0;
+      prefParentIdx = MAXNUMNEIGHBORS;
+   }
+   
+   // at this point, if a preferred parent was not present or discarded at the previous step,
+   // an available feasible successor becomes the preferred parent, if the resulting DAGrank
+   // is lower or equal to the previous DAGrank stored
+   if (
+         (prefParentIdx == MAXNUMNEIGHBORS)
+         &&
+         (feasParentIdx != MAXNUMNEIGHBORS)
+         &&
+         (feasParentDAGrank <= neighbors_vars.myPreviousDAGrank)
+      ) {
+      prefParentIdx = feasParentIdx;
+      prefParentDAGrank = feasParentDAGrank;
+   }
+   
+   // if a preferred parent is present, parentPreference, myDAGrank and myPreviousDAGrank
+   // are updated; else myDAGrank is set to DEFAULTDAGRANK (myPreviousDAGrank is left untouched
+   // for avoiding possible loops)
+   if (prefParentIdx != MAXNUMNEIGHBORS) {
+      neighbors_vars.neighbors[prefParentIdx].parentPreference          = MAXPREFERENCE;
+      neighbors_vars.neighbors[prefParentIdx].stableNeighbor            = TRUE;
+      neighbors_vars.neighbors[prefParentIdx].switchStabilityCounter    = 0;
+      neighbors_vars.myDAGrank                                          = prefParentDAGrank;
+      neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
+   } else {
+      neighbors_vars.myDAGrank                                          = DEFAULTDAGRANK;
    }
 }
 
@@ -593,7 +619,6 @@ void registerNewNeighbor(open_addr_t* address,
                          bool         joinPrioPresent,
                          uint8_t      joinPrio) {
    uint8_t     i,j;
-   bool        iHaveAPreferedParent;
    bool        f_isUsedRow;
    bool        f_isUnstableNeighborAvailable;
    dagrank_t   maxDAGrank;
@@ -665,18 +690,6 @@ void registerNewNeighbor(open_addr_t* address,
       //update jp
       if (joinPrioPresent==TRUE){
          neighbors_vars.neighbors[i].joinPrio=joinPrio;
-      }
-      
-      // do I already have a preferred parent ? -- TODO change to use JP
-      iHaveAPreferedParent = FALSE;
-      for (j=0;j<MAXNUMNEIGHBORS;j++) {
-         if (neighbors_vars.neighbors[j].parentPreference==MAXPREFERENCE) {
-            iHaveAPreferedParent = TRUE;
-         }
-      }
-      // if I have none, and I'm not DAGroot, the new neighbor is my preferred
-      if (iHaveAPreferedParent==FALSE && idmanager_getIsDAGroot()==FALSE) {      
-         neighbors_vars.neighbors[i].parentPreference     = MAXPREFERENCE;
       }
    } else {
       openserial_printError(COMPONENT_NEIGHBORS,ERR_NEIGHBORS_FULL,

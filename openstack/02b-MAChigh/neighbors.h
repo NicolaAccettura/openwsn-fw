@@ -65,6 +65,7 @@ END_PACK
 typedef struct {
    neighborRow_t        neighbors[MAXNUMNEIGHBORS];
    dagrank_t            myDAGrank;
+   dagrank_t            myPreviousDAGrank;
    uint8_t              debugRow;
    icmpv6rpl_dio_ht*    dio; //keep it global to be able to debug correctly.
 } neighbors_vars_t;
@@ -75,6 +76,7 @@ void          neighbors_init(void);
 
 // getters
 dagrank_t     neighbors_getMyDAGrank(void);
+dagrank_t     neighbors_getMyPreviousDAGrank(void); 
 uint8_t       neighbors_getNumNeighbors(void);
 bool          neighbors_getPreferredParentEui64(open_addr_t* addressToWrite);
 open_addr_t*  neighbors_getKANeighbor(uint16_t kaPeriod);
