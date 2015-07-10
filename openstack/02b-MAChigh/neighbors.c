@@ -7,6 +7,7 @@
 #include "IEEE802154E.h"
 #include "opentimers.h"
 #include "scheduler.h"
+#include "leds.h"
 
 //=========================== variables =======================================
 
@@ -45,6 +46,7 @@ void neighbors_init() {
    // set myDAGrank
    if (idmanager_getIsDAGroot()==TRUE) {
       neighbors_vars.myDAGrank=MINHOPRANKINCREASE;
+      leds_sync_on();
    } else {
       neighbors_vars.myDAGrank=DEFAULTDAGRANK;
       neighbors_vars.timerId  = opentimers_start(
@@ -509,6 +511,7 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
        neighbors_vars.myDAGrank=MINHOPRANKINCREASE;
        neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
        neighbors_timer_cleanup_update(FALSE);
+       leds_sync_on();
        return;
    }
    
@@ -585,8 +588,10 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
       neighbors_vars.myDAGrank                                          = prefParentDAGrank;
       neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
       neighbors_timer_cleanup_update(TRUE);
+      leds_sync_on();
    } else {
       neighbors_vars.myDAGrank                                          = DEFAULTDAGRANK;
+      leds_sync_off();
    }
 }
 
