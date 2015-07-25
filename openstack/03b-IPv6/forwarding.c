@@ -276,10 +276,10 @@ void forwarding_receive(
       if (ipv6_outer_header->next_header!=IANA_IPv6ROUTE) {
          // no source routing header present
          //check if flow label rpl header
-
- 	     flags = rpl_option->flags;
-  	     senderRank = rpl_option->senderRank;
-
+         
+         flags = rpl_option->flags;
+         senderRank = rpl_option->senderRank;
+         
          if ((flags & O_FLAG)!=0){
             // wrong direction
             
@@ -292,12 +292,16 @@ void forwarding_receive(
             );
          }
          
-
+         if ((rpl_option->flags & R_FLAG)!=0) {
+            openqueue_freePacketBuffer(msg);
+            return;
+         }
+         
          if (senderRank < neighbors_getMyDAGrank()){
             // loop detected
             // set flag
-       	    rpl_option->flags |= R_FLAG;
-
+            rpl_option->flags |= R_FLAG;
+            
             // log error
             openserial_printError(
                COMPONENT_FORWARDING,
@@ -307,7 +311,7 @@ void forwarding_receive(
             );
          }
          
-
+         
          forwarding_createRplOption(rpl_option, rpl_option->flags);
          // resend as if from upper layer
          if (
