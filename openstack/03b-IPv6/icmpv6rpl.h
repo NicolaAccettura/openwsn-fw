@@ -37,17 +37,17 @@
 
 #define E_DAO_Transit_Info        0<<7
 
-#define PC1_A_DAO_Transit_Info    0<<7
+#define PC1_A_DAO_Transit_Info    1<<7
 #define PC1_B_DAO_Transit_Info    1<<6
 
-#define PC2_A_DAO_Transit_Info    0<<5
-#define PC2_B_DAO_Transit_Info    0<<4
+#define PC2_A_DAO_Transit_Info    1<<5
+#define PC2_B_DAO_Transit_Info    1<<4
 
-#define PC3_A_DAO_Transit_Info    0<<3
-#define PC3_B_DAO_Transit_Info    0<<2
+#define PC3_A_DAO_Transit_Info    1<<3
+#define PC3_B_DAO_Transit_Info    1<<2
 
-#define PC4_A_DAO_Transit_Info    0<<1
-#define PC4_B_DAO_Transit_Info    0<<0
+#define PC4_A_DAO_Transit_Info    1<<1
+#define PC4_B_DAO_Transit_Info    1<<0
 
 #define Prf_A_dio_options         0<<4
 #define Prf_B_dio_options         0<<3

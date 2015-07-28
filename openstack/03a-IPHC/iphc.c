@@ -104,7 +104,7 @@ owerror_t iphc_sendFromForwarding(
    //XV -poipoi we want to check if the source address prefix is the same as destination prefix
    if (packetfunctions_sameAddress(&temp_dest_prefix,&temp_src_prefix)) {   
    //dest and src on same prefix
-      if (neighbors_isStableNeighbor(&(msg->l3_destinationAdd))) {
+      if (packetfunctions_sameAddress(&temp_dest_mac64b,&(msg->l2_nextORpreviousHop))) {
          //if direct neighbors, MAC nextHop and IP destination indicate same node
          //the source can be ME or another who I am relaying from. If its me then SAM is elided,
          //if not SAM is 64b address 
