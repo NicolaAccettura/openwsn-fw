@@ -263,6 +263,49 @@ void packetfunctions_writeAddress(OpenQueueEntry_t* msg, open_addr_t* address, b
    }
 }
 
+bool packetfunctions_rewriteDestinationMACaddress(OpenQueueEntry_t* msg, open_addr_t* address, bool littleEndian) {
+   uint8_t i;
+   uint8_t address_length;
+   
+   if (msg->l2_destAddress == NULL) {
+      return FALSE;
+   }
+   
+   if (address->type != msg->l2_nextORpreviousHop.type) {
+      return FALSE;
+   }
+   
+   switch (address->type) {
+      case ADDR_16B:
+         address_length = 2;
+         break;
+      case ADDR_64B:
+         address_length = 8;
+         break;
+      default:
+         openserial_printCritical(COMPONENT_PACKETFUNCTIONS,ERR_WRONG_ADDR_TYPE,
+                               (errorparameter_t)address->type,
+                               (errorparameter_t)8);
+         return FALSE;
+   }
+   
+   // write address in packet
+   msg->l2_destAddress += sizeof(uint8_t) * address_length;
+   for (i=0;i<address_length;i++) {
+      msg->l2_destAddress -= sizeof(uint8_t);
+      if (littleEndian) {
+         *((uint8_t*)(msg->l2_destAddress)) = address->addr_128b[i];
+      } else {
+         *((uint8_t*)(msg->l2_destAddress)) = address->addr_128b[address_length-1-i];
+      }
+   }
+   
+   // update l2_nextORpreviousHop
+   memcpy(&(msg->l2_nextORpreviousHop),address,sizeof(open_addr_t));
+   
+   return TRUE;
+}
+
 //======= reserving/tossing headers
 
 void packetfunctions_reserveHeaderSize(OpenQueueEntry_t* pkt, uint8_t header_length) {
@@ -325,6 +368,9 @@ void packetfunctions_duplicatePacket(OpenQueueEntry_t* dst, OpenQueueEntry_t* sr
 
    // update l2_payload pointer
    dst->l2_payload = dst->payload + (src->l2_payload - src->payload);
+
+   // update l2_destAddress pointer
+   dst->l2_destAddress = dst->payload + (src->l2_destAddress - src->payload);
 
    // update l4_payload pointer
    dst->l4_payload = dst->payload + (src->l4_payload - src->payload);

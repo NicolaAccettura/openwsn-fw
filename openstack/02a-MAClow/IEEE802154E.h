@@ -217,6 +217,7 @@ typedef struct {
    asn_t                     asn;                     // current absolute slot number
    slotOffset_t              slotOffset;              // current slot offset
    slotOffset_t              nextActiveSlotOffset;    // next active slot offset
+   bool                      isLastScheduledSlot;     // TRUE if this is the last scheduled slot
    PORT_RADIOTIMER_WIDTH     deSyncTimeout;           // how many slots left before looses sync
    bool                      isSync;                  // TRUE iff mote is synchronized to network
    OpenQueueEntry_t          localCopyForTransmission;// copy of the frame used for current TX
@@ -247,7 +248,7 @@ typedef struct {
    bool                      isSecurityEnabled;       // whether security is applied
    bool                      isUnscheduledEB;         // whether a cell is being used for sending an unscheduled EB
    uint16_t                  numSkippedSlots;         // number of slots skipped 
-   bool                      serialInputOutput;       // start Inputting (1) or Outputting (0) on the serial
+   bool                      serialInput;             // start the DAGroot Inputting (1) or Outputting (0) on the serial
    // time correction
    int16_t                   timeCorrection;          // store the timeCorrection, prepend and retrieve it inside of frame header
 } ieee154e_vars_t;

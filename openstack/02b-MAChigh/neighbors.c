@@ -25,12 +25,13 @@ void registerNewNeighbor(
      );
 uint8_t findNeighborRow(open_addr_t* neighbor);
 void removeNeighbor(uint8_t neighborIndex);
+uint8_t neighbors_getLowestJoinPriorityNeighborIndex(void);
 bool isThisRowMatching(
         open_addr_t* address,
         uint8_t      rowNumber
      );
-void sortParentSet(void);
-bool addToParentSet(uint8_t neighborIdx);
+void addToParentSet(uint8_t neighborIdx);
+bool neighbors_isParentSetFull(void);
 void neighbors_timer_cleanup_cb(opentimer_id_t id);
 void neighbors_timer_cleanup_task(void);
 void neighbors_timer_cleanup_update(bool shouldRestart);
@@ -63,7 +64,6 @@ void neighbors_init() {
                                     neighbors_timer_cleanup_cb
                                  );
    }
-   neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
    neighbors_vars.myLowestDAGrank = neighbors_vars.myDAGrank;
 }
 
@@ -81,10 +81,10 @@ dagrank_t neighbors_getMyDAGrank() {
 /**
 \brief Retrieve this mote's current DAG rank.
 
-\returns This mote's current DAG rank.
+\returns This mote's lowest DAG rank.
 */
-dagrank_t neighbors_getMyPreviousDAGrank() {
-   return neighbors_vars.myPreviousDAGrank;
+dagrank_t neighbors_getMyLowestDAGrank() {
+   return neighbors_vars.myLowestDAGrank;
 }
 
 /**
@@ -160,15 +160,12 @@ bool neighbors_getParentByIndex(open_addr_t* addressToWrite, uint8_t parentIdx) 
 \param[in] addressToWrite Where to write the preferred parent's address to.
 \param[in] parentIdx Index of the parent in the parent set
 */
-bool neighbors_getNextHopParent(open_addr_t* addressToWrite) {
-   bool              foundParent;
+void neighbors_getNextHopParent(open_addr_t* addressToWrite) {
    uint8_t           currentParentIndex;
    
    addressToWrite->type = ADDR_NONE;
    
-   foundParent          = FALSE;
    currentParentIndex = neighbors_vars.currentParentIndex;
-   
    while (TRUE) {
       if (neighbors_vars.parents[currentParentIndex] == MAXNUMNEIGHBORS) {
          currentParentIndex = (currentParentIndex + 1) % PARENTSETSIZE;
@@ -178,13 +175,10 @@ bool neighbors_getNextHopParent(open_addr_t* addressToWrite) {
       } else {
          memcpy(addressToWrite,&(neighbors_vars.neighbors[neighbors_vars.parents[currentParentIndex]].addr_64b),sizeof(open_addr_t));
          addressToWrite->type=ADDR_64B;
-         foundParent=TRUE;
          neighbors_vars.currentParentIndex = (currentParentIndex + 1) % PARENTSETSIZE;
          break;
       }
    }
-   
-   return foundParent;
 }
 
 /**
@@ -203,23 +197,115 @@ conditions:
 */
 open_addr_t* neighbors_getKANeighbor(uint16_t kaPeriod) {
    uint16_t          timeSinceHeard;
-   open_addr_t*      addrPreferred;
-   uint8_t           preferredParentIndex;
+   open_addr_t*      addrToKA;
+   uint8_t           parentIndex;
+   uint8_t           neighborIndex;
+   uint8_t           kaIndex;
+   dagrank_t         minimumDAGrank;
    
-   // initialize
-   addrPreferred = NULL;
-   preferredParentIndex = neighbors_vars.parents[0];
-   
-   // scan through the neighbor table, and populate addrPreferred and addrOther
-   if (preferredParentIndex != MAXNUMNEIGHBORS) {
-      timeSinceHeard = ieee154e_asnDiff(&neighbors_vars.neighbors[preferredParentIndex].asn);
-      if (timeSinceHeard>kaPeriod) {
-         addrPreferred = &(neighbors_vars.neighbors[preferredParentIndex].addr_64b);
+   kaIndex = MAXNUMNEIGHBORS;
+   for (parentIndex=0;parentIndex<PARENTSETSIZE;parentIndex++) {
+      neighborIndex = neighbors_vars.parents[parentIndex];
+      if (neighborIndex != MAXNUMNEIGHBORS) {
+         if (openqueue_sixtopGetNumPacketsToNeighbor(&(neighbors_vars.neighbors[neighborIndex].addr_64b))==0) {
+            timeSinceHeard = ieee154e_asnDiff(&neighbors_vars.neighbors[neighborIndex].asn);
+            if (timeSinceHeard>kaPeriod) {
+               kaIndex = neighborIndex;
+            }
+         }
       }
    }
    
-   return addrPreferred;
+   if (kaIndex == MAXNUMNEIGHBORS) {
+      neighborIndex = neighbors_getLowestJoinPriorityNeighborIndex();
+      if (
+            (neighborIndex!=MAXNUMNEIGHBORS)
+            &&
+            (neighbors_vars.neighbors[neighborIndex].parentPreference == 0)
+            &&
+            (
+               (
+                  (neighbors_vars.neighbors[neighborIndex].DAGrank!=DEFAULTDAGRANK)
+                  &&
+                  (neighbors_vars.neighbors[neighborIndex].DAGrank < neighbors_vars.myDAGrank)
+               )
+               ||
+               (
+                  (neighbors_vars.neighbors[neighborIndex].DAGrank==DEFAULTDAGRANK)
+                  &&
+                  ((neighbors_vars.neighbors[neighborIndex].joinPrio + 1) * MINHOPRANKINCREASE < neighbors_vars.myDAGrank)
+               )
+            )
+         ) {
+         if (openqueue_sixtopGetNumPacketsToNeighbor(&(neighbors_vars.neighbors[neighborIndex].addr_64b))==0) {
+            timeSinceHeard = ieee154e_asnDiff(&neighbors_vars.neighbors[neighborIndex].asn);
+            if (timeSinceHeard>kaPeriod) {
+               kaIndex = neighborIndex;
+            }
+         }
+      }
+      if (kaIndex == MAXNUMNEIGHBORS) {
+         minimumDAGrank = DEFAULTDAGRANK;
+         for (neighborIndex=0;neighborIndex<MAXNUMNEIGHBORS;neighborIndex++) {
+            if (
+                  (neighbors_vars.neighbors[neighborIndex].used==TRUE)
+                  &&
+                  (neighbors_vars.neighbors[neighborIndex].parentPreference == 0)
+                  &&
+                  (neighbors_vars.neighbors[neighborIndex].DAGrank < minimumDAGrank)
+                  &&
+                  (neighbors_vars.neighbors[neighborIndex].DAGrank < neighbors_vars.myDAGrank)
+               ) {
+               minimumDAGrank = neighbors_vars.neighbors[neighborIndex].DAGrank;
+               kaIndex = neighborIndex;
+            }
+         }
+         if (kaIndex!=MAXNUMNEIGHBORS) {
+            if (openqueue_sixtopGetNumPacketsToNeighbor(&(neighbors_vars.neighbors[kaIndex].addr_64b))==0) {
+               timeSinceHeard = ieee154e_asnDiff(&neighbors_vars.neighbors[kaIndex].asn);
+               if (timeSinceHeard<=kaPeriod) {
+                  kaIndex = MAXNUMNEIGHBORS;
+               }
+            }
+         }
+      }
+   }
+   // initialize
+   addrToKA = NULL;
+   if (kaIndex != MAXNUMNEIGHBORS) {
+      addrToKA = &(neighbors_vars.neighbors[kaIndex].addr_64b);
+      //printf("%x keepaliving %x\n",idmanager_getMyID(ADDR_64B)->addr_64b[7],addrToKA->addr_64b[7]);
+   }
+   
+   return addrToKA;
 }
+
+bool neighbors_getOTFstatisticsByIndex(
+      uint8_t        neighborIndex,
+      open_addr_t*   address,
+      uint8_t*       requiredVirtualCells,
+      uint8_t*       aveRequiredVirtualCells
+   ) {
+   bool returnVal;
+   
+   returnVal = FALSE;
+   if ((neighborIndex<MAXNUMNEIGHBORS) && (neighbors_vars.neighbors[neighborIndex].used==TRUE)) {
+      memcpy(
+         address,
+         &neighbors_vars.neighbors[neighborIndex].addr_64b,
+         sizeof(open_addr_t)
+      );
+      *requiredVirtualCells = neighbors_vars.neighbors[neighborIndex].requiredVirtualCells;
+      *aveRequiredVirtualCells = neighbors_vars.neighbors[neighborIndex].aveRequiredVirtualCells;
+      neighbors_vars.neighbors[neighborIndex].aveRequiredVirtualCells =
+               (3 * neighbors_vars.neighbors[neighborIndex].aveRequiredVirtualCells 
+                        + neighbors_vars.neighbors[neighborIndex].requiredVirtualCells) / 4;
+      returnVal = TRUE;
+   }
+   
+   return returnVal;
+}
+
 
 //===== interrogators
 
@@ -267,19 +353,54 @@ bool neighbors_isStableNeighbor(open_addr_t* address) {
 \returns TRUE if that neighbor is preferred, FALSE otherwise.
 */
 bool neighbors_isPreferredParent(open_addr_t* address) {
+   uint8_t           i;
+   
+   INTERRUPT_DECLARATION();
+   DISABLE_INTERRUPTS();
+   
+   i = findNeighborRow(address);
+   if (
+         (i!=MAXNUMNEIGHBORS)
+         &&
+         (
+            (neighbors_vars.neighbors[i].parentPreference != 0)
+            ||
+            (i==neighbors_getLowestJoinPriorityNeighborIndex())
+         )
+      ) {
+      ENABLE_INTERRUPTS();
+      return TRUE;
+   }
+   
+   ENABLE_INTERRUPTS();
+   return FALSE;
+}
+
+/**
+\brief Indicate whether some neighbor is a parent.
+
+\param[in] address The EUI64 address of the neighbor.
+
+\returns TRUE if that neighbor is parent, FALSE otherwise.
+*/
+bool neighbors_isParent(open_addr_t* address) {
    bool              returnVal;
-   uint8_t           preferredParentIndex;
+   uint8_t           i;
    
    INTERRUPT_DECLARATION();
    DISABLE_INTERRUPTS();
    
    // by default, not preferred
    returnVal = FALSE;
-   preferredParentIndex = neighbors_vars.parents[0];
    
-   if (preferredParentIndex != MAXNUMNEIGHBORS) {
-      if (packetfunctions_sameAddress(address,&neighbors_vars.neighbors[preferredParentIndex].addr_64b)==TRUE) {
+   for (i=0;i<PARENTSETSIZE;i++) {
+      if (
+            (neighbors_vars.parents[i] != MAXNUMNEIGHBORS) 
+            &&
+            (packetfunctions_sameAddress(address,&neighbors_vars.neighbors[neighbors_vars.parents[i]].addr_64b)==TRUE)
+      ) {
          returnVal  = TRUE;
+         break;
       }
    }
    
@@ -306,7 +427,6 @@ bool neighbors_isNeighborWithLowerDAGrank(uint8_t index) {
    
    return returnVal;
 }
-
 
 /**
 \brief Indicate whether some neighbor has a lower DAG rank that me.
@@ -366,6 +486,7 @@ void neighbors_indicateRx(open_addr_t* l2_src,
       neighbors_vars.neighbors[i].numRx++;
       neighbors_vars.neighbors[i].rssi=rssi;
       memcpy(&neighbors_vars.neighbors[i].asn,asnTs,sizeof(asn_t));
+      
       //update jp
       if (joinPrioPresent==TRUE){
          neighbors_vars.neighbors[i].joinPrio=joinPrio;
@@ -418,30 +539,29 @@ The fields which are updated are:
 \param[in] asnTs ASN of the last transmission attempt.
 */
 void neighbors_indicateTx(open_addr_t* l2_dest,
-                          uint8_t      numTxAttempts,
-                          bool         was_finally_acked,
+                          bool succesfullTx,
                           asn_t*       asnTs) {
    uint8_t i;
-   // don't run through this function if packet was sent to broadcast address
-   if (packetfunctions_isBroadcastMulticast(l2_dest)==TRUE) {
-      return;
-   }
    
-   i = findNeighborRow(l2_dest);
-   if (i<MAXNUMNEIGHBORS) {
+   // don't run through this function if packet was sent to broadcast address
+   if (packetfunctions_isBroadcastMulticast(l2_dest)==FALSE) {
       
-      // handle roll-over case
-      if (neighbors_vars.neighbors[i].numTx>(0xff-numTxAttempts)) {
-         neighbors_vars.neighbors[i].numWraps++; //counting the number of times that tx wraps.
-         neighbors_vars.neighbors[i].numTx/=2;
-         neighbors_vars.neighbors[i].numTxACK/=2;
-      }
-      // update statistics
-      neighbors_vars.neighbors[i].numTx += numTxAttempts; 
-      
-      if (was_finally_acked==TRUE) {
-         neighbors_vars.neighbors[i].numTxACK++;
-         memcpy(&neighbors_vars.neighbors[i].asn,asnTs,sizeof(asn_t));
+      i = findNeighborRow(l2_dest);
+      if (i<MAXNUMNEIGHBORS) {
+         
+         // handle roll-over case
+         if (neighbors_vars.neighbors[i].numTx==0xff) {
+            neighbors_vars.neighbors[i].numWraps++; //counting the number of times that tx wraps.
+            neighbors_vars.neighbors[i].numTx/=2;
+            neighbors_vars.neighbors[i].numTxACK/=2;
+         }
+         // update statistics
+         neighbors_vars.neighbors[i].numTx++; 
+         
+         if (succesfullTx==TRUE) {
+            neighbors_vars.neighbors[i].numTxACK++;
+            memcpy(&neighbors_vars.neighbors[i].asn,asnTs,sizeof(asn_t));
+         }
       }
    }
 }
@@ -475,25 +595,12 @@ void neighbors_indicateRxDIO(OpenQueueEntry_t* msg, bool* newDODAGID) {
    i = findNeighborRow(&(msg->l2_nextORpreviousHop));
    if (i<MAXNUMNEIGHBORS) {
       if (*newDODAGID == FALSE) {
-         if (
-               neighbors_vars.dio->rank != DEFAULTDAGRANK &&
-               neighbors_vars.dio->rank > neighbors_vars.neighbors[i].DAGrank &&
-               neighbors_vars.dio->rank - neighbors_vars.neighbors[i].DAGrank >(DEFAULTLINKCOST*2*MINHOPRANKINCREASE)
-            ) {
-            // the new DAGrank looks suspiciously high, only increment a bit
-            neighbors_vars.neighbors[i].DAGrank += (DEFAULTLINKCOST*2*MINHOPRANKINCREASE);
-            openserial_printError(COMPONENT_NEIGHBORS,ERR_LARGE_DAGRANK,
-                                  (errorparameter_t)neighbors_vars.dio->rank,
-                                  (errorparameter_t)neighbors_vars.neighbors[i].DAGrank);
-         } else {
-            neighbors_vars.neighbors[i].DAGrank = neighbors_vars.dio->rank;
-         }
+         neighbors_vars.neighbors[i].DAGrank = neighbors_vars.dio->rank;
       } else {
          for (j=0;((j<MAXNUMNEIGHBORS) && (j != i));j++) {
             removeNeighbor(j);
          }
          neighbors_vars.myDAGrank = DEFAULTDAGRANK;
-         neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
          neighbors_vars.myLowestDAGrank = neighbors_vars.myDAGrank;
          neighbors_vars.neighbors[i].DAGrank = neighbors_vars.dio->rank;
       }
@@ -535,6 +642,26 @@ void neighbors_setAdvertizedDAGrank() {
    }
 }
 
+void neighbors_updateEnqueuedPacketsToNeighbor(open_addr_t* address) {
+   uint8_t i;
+      
+   i = findNeighborRow(address);
+   if (i != MAXNUMNEIGHBORS) {
+      neighbors_vars.neighbors[i].requiredVirtualCells++;
+   }
+}
+
+void neighbors_resetOTFstatistics() {
+   uint8_t i;
+   
+   for (i=0;i<MAXNUMNEIGHBORS;i++) {
+      if (neighbors_vars.neighbors[i].used==TRUE) {
+         neighbors_vars.neighbors[i].requiredVirtualCells = 
+                  openqueue_sixtopGetNumPacketsToNeighbor(&(neighbors_vars.neighbors[i].addr_64b));
+      }
+   }
+}
+
 //===== managing routing info
 
 /**
@@ -552,9 +679,8 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
    dagrank_t   rankIncrease;
    uint32_t    tentativeDAGrank; // 32-bit since is used to sum
    uint32_t    rankIncreaseIntermediary; // stores intermediary results of rankIncrease calculation
-   dagrank_t   minResultingDAGrank;
-   dagrank_t   morePreferredResultingDAGrank;
-   uint8_t     morePreferredParent;
+   uint8_t     tempParent;
+   uint16_t    useThreshold;
    dagrank_t   finalDAGrank;
    dagrank_t   tempDAGrank;
    
@@ -562,14 +688,13 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
    if ((idmanager_getIsDAGroot())==TRUE) {
        // the dagrank is not set through setting command, set rank to MINHOPRANKINCREASE here 
        neighbors_vars.myDAGrank=MINHOPRANKINCREASE;
-       neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
        neighbors_vars.myLowestDAGrank = neighbors_vars.myDAGrank;
        neighbors_timer_cleanup_update(FALSE);
        leds_sync_on();
        return;
    }
    
-   // STEP 1: loop through neighbor table, calculate resulting DAGrank
+   // STEP 1: loop through neighbor table, reset preference (will be updated), calculate resulting DAGrank
    for (i=0;i<MAXNUMNEIGHBORS;i++) {
       if (neighbors_vars.neighbors[i].used==TRUE) {
          
@@ -584,6 +709,9 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
             rankIncreaseIntermediary = (rankIncreaseIntermediary * 2 * MINHOPRANKINCREASE) / 
                      ((uint32_t)neighbors_vars.neighbors[i].numTxACK);
             rankIncrease = (uint16_t)(rankIncreaseIntermediary >> 10);
+            if (neighbors_vars.neighbors[i].numTx < DEFAULTLINKCOST/2) {
+               rankIncrease += (DEFAULTLINKCOST/2 - neighbors_vars.neighbors[i].numTx) * 2 * MINHOPRANKINCREASE;
+            }
          }
          // if the resulting DAGrank is bigger than MAXDAGRANK, set the resulting DAGrank to MAXDAGRANK
          tentativeDAGrank = neighbors_vars.neighbors[i].DAGrank+rankIncrease;
@@ -593,55 +721,84 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
          // update the resultingDAGrank for this neighbor
          neighbors_vars.neighbors[i].resultingDAGrank = tentativeDAGrank;
       }
-   } 
+   }
    
-   // STEP 2: build the parent set
-   // sort the current parent set according to the resulting DAGrank
-   sortParentSet();
-   // update the current parent set
-   morePreferredParent = MAXNUMNEIGHBORS;
-   morePreferredResultingDAGrank = 0;
-   for (j=0;j<PARENTSETSIZE;j++) {
-      minResultingDAGrank = MAXDAGRANK;
-      for (i=0;i<MAXNUMNEIGHBORS;i++) {
-         if (
-               (neighbors_vars.neighbors[i].used==TRUE)
-               &&
-               (i != morePreferredParent)
-               &&
-               (neighbors_vars.neighbors[i].resultingDAGrank >= morePreferredResultingDAGrank)
-               &&
-               (neighbors_vars.neighbors[i].resultingDAGrank < minResultingDAGrank)
-               &&
-               (neighbors_vars.neighbors[i].resultingDAGrank <= 
-                        (uint32_t)neighbors_vars.myLowestDAGrank + DEFAULTLINKCOST*2*MINHOPRANKINCREASE)
-               &&
-               (
-                  (
-                     (j==0)
-                     && 
-                     (neighbors_vars.neighbors[i].resultingDAGrank <= neighbors_vars.myPreviousDAGrank)
-                  )
-                  ||
-                  (j!=0)
-               ) 
-         ) {
-            minResultingDAGrank = neighbors_vars.neighbors[i].resultingDAGrank;
-            morePreferredParent = i;
+   // STEP 2: sort and clean the current parent set according to the resulting DAGrank
+   for (i=0;i<PARENTSETSIZE;i++) {
+      for (j=i+1;j<PARENTSETSIZE;j++) {
+         if (neighbors_vars.parents[i] == MAXNUMNEIGHBORS) {
+            neighbors_vars.parents[i] = neighbors_vars.parents[j];
+            neighbors_vars.parents[j] = MAXNUMNEIGHBORS;
+         } else if (neighbors_vars.parents[j] != MAXNUMNEIGHBORS) {
+            if (neighbors_vars.neighbors[neighbors_vars.parents[i]].resultingDAGrank > 
+                  neighbors_vars.neighbors[neighbors_vars.parents[j]].resultingDAGrank) {
+               tempParent = neighbors_vars.parents[i];
+               neighbors_vars.parents[i] = neighbors_vars.parents[j];
+               neighbors_vars.parents[j] = tempParent;
+            }
          }
       }
-      if (
-            (morePreferredParent != MAXNUMNEIGHBORS)
-            &&
-            (addToParentSet(morePreferredParent) == TRUE)
-      ) {
-         morePreferredResultingDAGrank = minResultingDAGrank;
-      } else {
+      if (neighbors_vars.parents[i] == MAXNUMNEIGHBORS) {
+         break;
+      } else if (
+            (neighbors_vars.neighbors[neighbors_vars.parents[i]].resultingDAGrank == MAXDAGRANK)
+            ||
+            (
+               ((uint32_t)neighbors_vars.myLowestDAGrank + MAXRANKINCREASE < MAXDAGRANK)
+               &&
+               (neighbors_vars.neighbors[neighbors_vars.parents[i]].resultingDAGrank >
+                  neighbors_vars.myLowestDAGrank + MAXRANKINCREASE) 
+            )
+         ) {
+         for (j=i;j<PARENTSETSIZE;j++) {
+            neighbors_vars.parents[j] = MAXNUMNEIGHBORS;
+         }
          break;
       }
    }
    
-   // STEP 3: set preferences
+   // STEP 3: check if the current parent set is alredy full, if yes enable use of PARENTSWITCHTHRESHOLD
+   useThreshold = 0;
+   if (neighbors_vars.parents[PARENTSETSIZE-1] != MAXNUMNEIGHBORS) {
+      useThreshold = 1;
+   }
+   
+   // STEP 4: loop through neighbors and check if they can be added to the parent set
+   for (i=0;i<MAXNUMNEIGHBORS;i++) {
+      if (
+            (neighbors_vars.neighbors[i].used==TRUE)
+            &&
+            (neighbors_vars.neighbors[i].resultingDAGrank != MAXDAGRANK)
+            &&
+            (
+               ((uint32_t)neighbors_vars.myLowestDAGrank + MAXRANKINCREASE >= MAXDAGRANK)
+               ||
+               (
+                  ((uint32_t)neighbors_vars.myLowestDAGrank + MAXRANKINCREASE < MAXDAGRANK)
+                  &&
+                  (neighbors_vars.neighbors[i].resultingDAGrank <= neighbors_vars.myLowestDAGrank + MAXRANKINCREASE)
+               )
+            )
+            &&
+            (
+               (neighbors_vars.parents[PARENTSETSIZE-1] == MAXNUMNEIGHBORS)
+               ||
+               (
+                  (neighbors_vars.parents[PARENTSETSIZE-1] != MAXNUMNEIGHBORS)
+                  &&
+                  ((uint32_t)neighbors_vars.neighbors[i].resultingDAGrank + (uint32_t)useThreshold * PARENTSWITCHTHRESHOLD <
+                     MAXDAGRANK)
+                  &&
+                  (neighbors_vars.neighbors[neighbors_vars.parents[PARENTSETSIZE-1]].resultingDAGrank >= 
+                     neighbors_vars.neighbors[i].resultingDAGrank + useThreshold * PARENTSWITCHTHRESHOLD)
+               )
+            ) 
+         ) {
+         addToParentSet(i);
+      }
+   }
+   
+   // STEP 5: set preferences
    for (j=0;j<PARENTSETSIZE;j++) {
       if (neighbors_vars.parents[j] != MAXNUMNEIGHBORS) {
          if (j==0) {
@@ -656,7 +813,7 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
       }
    }
    
-   // STEP 4: update dagrank
+   // STEP 6: update dagrank
    finalDAGrank = DEFAULTDAGRANK;
    if (neighbors_vars.parents[0] != MAXNUMNEIGHBORS) {
       finalDAGrank = neighbors_vars.neighbors[neighbors_vars.parents[0]].resultingDAGrank;
@@ -673,9 +830,9 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
       }
       for (j=0;j<PARENTSETSIZE;j++) {
          if (neighbors_vars.parents[j] != MAXNUMNEIGHBORS) {
-            if (neighbors_vars.neighbors[neighbors_vars.parents[j]].resultingDAGrank > DEFAULTLINKCOST*2*MINHOPRANKINCREASE) {
+            if (neighbors_vars.neighbors[neighbors_vars.parents[j]].resultingDAGrank > MAXRANKINCREASE) {
                tempDAGrank = 
-                        neighbors_vars.neighbors[neighbors_vars.parents[j]].resultingDAGrank - DEFAULTLINKCOST*2*MINHOPRANKINCREASE;
+                        neighbors_vars.neighbors[neighbors_vars.parents[j]].resultingDAGrank - MAXRANKINCREASE;
                if (tempDAGrank > finalDAGrank) {
                   finalDAGrank = tempDAGrank;
                }
@@ -687,7 +844,6 @@ void neighbors_updateMyDAGrankAndNeighborPreference() {
    }
    neighbors_vars.myDAGrank = finalDAGrank;
    if (finalDAGrank != DEFAULTDAGRANK) {
-      neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
       neighbors_timer_cleanup_update(TRUE);
       leds_sync_on();
    } else {
@@ -725,10 +881,46 @@ status information about several modules in the OpenWSN stack.
 */
 bool debugPrint_neighbors() {
    debugNeighborEntry_t temp;
+   
    neighbors_vars.debugRow=(neighbors_vars.debugRow+1)%MAXNUMNEIGHBORS;
-   temp.row=neighbors_vars.debugRow;
-   temp.neighborEntry=neighbors_vars.neighbors[neighbors_vars.debugRow];
+   
+   temp.row                            = \
+      neighbors_vars.debugRow;
+   temp.used                           = \
+      neighbors_vars.neighbors[neighbors_vars.debugRow].used;
+   temp.parentPreference               = \
+      neighbors_vars.neighbors[neighbors_vars.debugRow].parentPreference;
+   temp.stableNeighbor                 = \
+      neighbors_vars.neighbors[neighbors_vars.debugRow].stableNeighbor;
+   temp.switchStabilityCounter         = \
+      neighbors_vars.neighbors[neighbors_vars.debugRow].switchStabilityCounter;
+   memcpy(
+      &temp.addr_64b,
+      &neighbors_vars.neighbors[neighbors_vars.debugRow].addr_64b,
+      sizeof(open_addr_t)
+   );
+   temp.DAGrank                        = \
+      neighbors_vars.neighbors[neighbors_vars.debugRow].DAGrank;
+   temp.rssi                           = \
+      neighbors_vars.neighbors[neighbors_vars.debugRow].rssi;
+   temp.numRx                          = \
+      neighbors_vars.neighbors[neighbors_vars.debugRow].numRx;
+   temp.numTx                          = \
+      neighbors_vars.neighbors[neighbors_vars.debugRow].numTx;
+   temp.numTxACK                       = \
+      neighbors_vars.neighbors[neighbors_vars.debugRow].numTxACK;
+   temp.numWraps                       = \
+      neighbors_vars.neighbors[neighbors_vars.debugRow].numWraps;
+   memcpy(
+      &temp.asn,
+      &neighbors_vars.neighbors[neighbors_vars.debugRow].asn,
+      sizeof(asn_t)
+   );
+   temp.joinPrio                       = \
+      neighbors_vars.neighbors[neighbors_vars.debugRow].joinPrio;
+   
    openserial_printStatus(STATUS_NEIGHBORS,(uint8_t*)&temp,sizeof(debugNeighborEntry_t));
+   
    return TRUE;
 }
 
@@ -808,7 +1000,13 @@ void registerNewNeighbor(open_addr_t* address,
       //update jp
       if (joinPrioPresent==TRUE){
          neighbors_vars.neighbors[i].joinPrio=joinPrio;
+      } else {
+         neighbors_vars.neighbors[i].joinPrio=DEFAULTJOINPRIORITY;
       }
+      neighbors_vars.neighbors[i].requiredVirtualCells = 
+         openqueue_sixtopGetNumPacketsToNeighbor(&(neighbors_vars.neighbors[i].addr_64b));
+      neighbors_vars.neighbors[i].aveRequiredVirtualCells = 
+         neighbors_vars.neighbors[i].requiredVirtualCells;
    } else {
       openserial_printError(COMPONENT_NEIGHBORS,ERR_NEIGHBORS_FULL,
                             (errorparameter_t)MAXNUMNEIGHBORS,
@@ -839,6 +1037,29 @@ void removeNeighbor(uint8_t neighborIndex) {
    memset(&(neighbors_vars.neighbors[neighborIndex]),0,sizeof(neighborRow_t));
    neighbors_vars.neighbors[neighborIndex].DAGrank                   = DEFAULTDAGRANK;
    neighbors_vars.neighbors[neighborIndex].resultingDAGrank          = DEFAULTDAGRANK;
+   neighbors_vars.neighbors[neighborIndex].joinPrio                  = DEFAULTJOINPRIORITY;
+}
+
+uint8_t neighbors_getLowestJoinPriorityNeighborIndex() {
+   uint8_t           i;
+   uint8_t           lowestJoinPriority;
+   uint8_t           lowestJoinPriorityNeighborIndex;
+   
+   lowestJoinPriority = DEFAULTJOINPRIORITY;
+   lowestJoinPriorityNeighborIndex = MAXNUMNEIGHBORS;
+   
+   for (i=0;i<MAXNUMNEIGHBORS;i++) {
+      if (
+            (neighbors_vars.neighbors[i].used==TRUE)
+            &&
+            (neighbors_vars.neighbors[i].joinPrio < lowestJoinPriority)
+         ) {
+         lowestJoinPriority = neighbors_vars.neighbors[i].joinPrio;
+         lowestJoinPriorityNeighborIndex = i;
+      }
+   }
+   
+   return lowestJoinPriorityNeighborIndex;
 }
 
 //=========================== helpers =========================================
@@ -856,56 +1077,35 @@ bool isThisRowMatching(open_addr_t* address, uint8_t rowNumber) {
    }
 }
 
-void sortParentSet() {
-   uint8_t i,j,temp;
-   for (i=0;i<PARENTSETSIZE;i++) {
-      for (j=i+1;j<PARENTSETSIZE;j++) {
-         if (neighbors_vars.parents[i] == MAXNUMNEIGHBORS) {
-            neighbors_vars.parents[i] = neighbors_vars.parents[j];
-            neighbors_vars.parents[j] = MAXNUMNEIGHBORS;
-         } else if (neighbors_vars.parents[j] != MAXNUMNEIGHBORS) {
-            if (neighbors_vars.neighbors[neighbors_vars.parents[i]].resultingDAGrank > 
-                  neighbors_vars.neighbors[neighbors_vars.parents[j]].resultingDAGrank) {
-               temp = neighbors_vars.parents[i];
-               neighbors_vars.parents[i] = neighbors_vars.parents[j];
-               neighbors_vars.parents[j] = temp;
-            }
-         }
-      }
-   }
-}
-
-bool addToParentSet(uint8_t neighborIdx) {
+void addToParentSet(uint8_t neighborIdx) {
    uint8_t     parentIdx;
-   dagrank_t   neighborDAGrank;
    
-   neighborDAGrank      = neighbors_vars.neighbors[neighborIdx].resultingDAGrank;
+   //assuming that the parent set is sorted according to ranks
    
    // check if neighbor is already in parent set
    for (parentIdx=0;parentIdx<PARENTSETSIZE;parentIdx++) {
       if (neighbors_vars.parents[parentIdx] == neighborIdx) {
-         return TRUE;
+         return;
       } else if (neighbors_vars.parents[parentIdx] == MAXNUMNEIGHBORS) {
          break;
       }
    }
    
+   // if the parent set is full, delete the last one
    if (parentIdx == PARENTSETSIZE) {
-      // the parent set is full, set parentIdx to point the last element in the parent set
       parentIdx--;
-      // not sure, check against PARENTSWITCHTHRESHOLD
-      if (neighbors_vars.neighbors[neighbors_vars.parents[parentIdx]].resultingDAGrank < neighborDAGrank + PARENTSWITCHTHRESHOLD) {
-         return FALSE;
-      } else {
-         neighbors_vars.parents[parentIdx] = MAXNUMNEIGHBORS;
-      }
+      neighbors_vars.parents[parentIdx] = MAXNUMNEIGHBORS;
    }
    
-   // if I'm here, I will add the neighbor in the parent set
-   
+   // add the parent index in the right position
    while (TRUE) {
       // has the last parent in the parent set a DAGrank greater than that of the neighbor 
-      if ((parentIdx!=0) && (neighbors_vars.neighbors[neighbors_vars.parents[parentIdx-1]].resultingDAGrank > neighborDAGrank)) {
+      if (
+            (parentIdx!=0)
+            &&
+            (neighbors_vars.neighbors[neighbors_vars.parents[parentIdx-1]].resultingDAGrank > 
+               neighbors_vars.neighbors[neighborIdx].resultingDAGrank)
+         ) {
          neighbors_vars.parents[parentIdx] = neighbors_vars.parents[parentIdx-1];
          parentIdx--;
       } else {
@@ -913,8 +1113,20 @@ bool addToParentSet(uint8_t neighborIdx) {
          break;
       }
    }
+}
+
+bool neighbors_isParentSetFull() {
+   bool returnValue;
+   uint8_t     parentIdx;
    
-   return TRUE;
+   returnValue = TRUE;
+   for (parentIdx=0;parentIdx<PARENTSETSIZE;parentIdx++) {
+      if (neighbors_vars.parents[parentIdx] == MAXNUMNEIGHBORS) {
+         returnValue = FALSE;
+         break;
+      }
+   }
+   return returnValue;
 }
 
 void neighbors_timer_cleanup_cb(opentimer_id_t id) {
@@ -922,7 +1134,6 @@ void neighbors_timer_cleanup_cb(opentimer_id_t id) {
 }
 
 void neighbors_timer_cleanup_task(void) {
-   neighbors_vars.myPreviousDAGrank = neighbors_vars.myDAGrank;
    neighbors_vars.myLowestDAGrank = neighbors_vars.myDAGrank;
 }
 

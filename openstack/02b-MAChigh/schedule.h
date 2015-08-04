@@ -17,7 +17,7 @@
 
 The superframe repears over time and can be arbitrarly long.
 */
-#define SLOTFRAME_LENGTH    11 //should be 101
+#define SLOTFRAME_LENGTH    73
 
 //draft-ietf-6tisch-minimal-06
 #define SCHEDULE_MINIMAL_6TISCH_ACTIVE_CELLS                      1
@@ -26,8 +26,8 @@ The superframe repears over time and can be arbitrarly long.
 #define SCHEDULE_MINIMAL_6TISCH_DEFAULT_SLOTFRAME_HANDLE          1 //id of slotframe
 #define SCHEDULE_MINIMAL_6TISCH_DEFAULT_SLOTFRAME_NUMBER          1 //1 slotframe by default.
 
-#define NUMSERIALRX          1
-#define NUMSLOTSOFF          1
+#define NUMSLOTSOFF          72
+#define NUMSERIALRX           3
 
 /**
 \brief Maximum number of active slots in a superframe.
@@ -161,13 +161,17 @@ owerror_t          schedule_removeActiveSlot(
    open_addr_t*         neighbor
 );
 bool               schedule_isSlotOffsetAvailable(uint16_t slotOffset);
+void               schedule_getRandomAvailableSlotOffsets(uint16_t* numSlotOffsets, uint16_t* slotOffsets);
 // return the slot info which has a poor quality
-scheduleEntry_t*  schedule_statistic_poorLinkQuality(void);
+scheduleEntry_t*   schedule_statistic_poorLinkQuality(open_addr_t* neighbor,scheduleEntry_t* scheduleWalkerPoorer, bool checkPDRthreshold);
+uint8_t            schedule_getVirtualScheduledCellsToNeighbor(open_addr_t* address);
+uint16_t           schedule_getNumTxCellsToNeighbor(open_addr_t* address);
 
 // from IEEE802154E
 bool               schedule_syncSlotOffset(slotOffset_t targetSlotOffset);
 void               schedule_advanceSlot(void);
 slotOffset_t       schedule_getNextActiveSlotOffset(void);
+cellType_t         schedule_getNextActiveSlotOffsetType(void);
 slotOffset_t       schedule_getClosestActiveSlotOffset(slotOffset_t targetSlotOffset);
 frameLength_t      schedule_getFrameLength(void);
 uint8_t            schedule_getFrameHandle(void);

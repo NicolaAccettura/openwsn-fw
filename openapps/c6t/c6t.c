@@ -89,11 +89,11 @@ owerror_t c6t_receive(
             break;
          }
          
-         sixtop_setHandler(SIX_HANDLER_OTF);
          // call sixtop
          sixtop_addCells(
             &neighbor,
-            1
+            1,
+            SIX_HANDLER_C6T
          );
          
          // set the CoAP header
@@ -117,10 +117,11 @@ owerror_t c6t_receive(
             break;
          }
          
-         sixtop_setHandler(SIX_HANDLER_OTF);
          // call sixtop
-         sixtop_removeCell(
-            &neighbor
+         sixtop_removeCells(
+            &neighbor,
+            1,
+            SIX_HANDLER_C6T
          );
          
          // set the CoAP header

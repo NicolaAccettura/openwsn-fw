@@ -14,6 +14,7 @@
 //=========================== define ==========================================
 
 #define QUEUELENGTH  10
+#define NUMSUREFREEENTRIES 3
 
 //=========================== typedef =========================================
 
@@ -26,6 +27,7 @@ typedef struct {
 
 typedef struct {
    OpenQueueEntry_t queue[QUEUELENGTH];
+   bool             stopSendingOnShared;
 } openqueue_vars_t;
 
 //=========================== prototypes ======================================
@@ -35,14 +37,17 @@ void               openqueue_init(void);
 bool               debugPrint_queue(void);
 // called by any component
 OpenQueueEntry_t*  openqueue_getFreePacketBuffer(uint8_t creator);
-owerror_t         openqueue_freePacketBuffer(OpenQueueEntry_t* pkt);
+OpenQueueEntry_t*  openqueue_getSureFreePacketBuffer(uint8_t creator);
+owerror_t          openqueue_freePacketBuffer(OpenQueueEntry_t* pkt);
 void               openqueue_removeAllCreatedBy(uint8_t creator);
 void               openqueue_removeAllOwnedBy(uint8_t owner);
 // called by res
 OpenQueueEntry_t*  openqueue_sixtopGetSentPacket(void);
 OpenQueueEntry_t*  openqueue_sixtopGetReceivedPacket(void);
+uint8_t            openqueue_sixtopGetNumPacketsToNeighbor(open_addr_t* toNeighbor);
+void               openqueue_sixtopSetStopSendingOnShared(bool stopSendingOnShared);
 // called by IEEE80215E
-OpenQueueEntry_t*  openqueue_macGetDataPacket(open_addr_t* toNeighbor);
+OpenQueueEntry_t*  openqueue_macGetDataPacket(open_addr_t* toNeighbor, bool couldChangeNextHop, bool* willChangeNextHop);
 OpenQueueEntry_t*  openqueue_macGetEBPacket(void);
 
 /**

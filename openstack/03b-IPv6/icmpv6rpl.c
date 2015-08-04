@@ -45,7 +45,8 @@ void icmpv6rpl_init() {
    
    //=== admin
    
-   icmpv6rpl_vars.busySending               = FALSE;
+   icmpv6rpl_vars.busySendingDIO            = FALSE;
+   icmpv6rpl_vars.busySendingDAO            = FALSE;
    icmpv6rpl_vars.fDodagidWritten           = 0;
    
    //=== DIO
@@ -153,6 +154,7 @@ uint8_t icmpv6rpl_getRPLIntanceID(){
 \param[in] error Outcome of the sending.
 */
 void icmpv6rpl_sendDone(OpenQueueEntry_t* msg, owerror_t error) {
+   bool isDIO;
    
    // take ownership over that packet
    msg->owner = COMPONENT_ICMPv6RPL;
@@ -164,11 +166,25 @@ void icmpv6rpl_sendDone(OpenQueueEntry_t* msg, owerror_t error) {
                             (errorparameter_t)0);
    }
    
+   isDIO = msg->l4_isDIO;
+   
    // free packet
    openqueue_freePacketBuffer(msg);
    
    // I'm not busy sending anymore
-   icmpv6rpl_vars.busySending = FALSE;
+   if (isDIO==TRUE) {
+      icmpv6rpl_vars.busySendingDIO = FALSE;
+   } else {
+      /*if (error == E_FAIL) {
+         printf("%02x LOST %02x ASN %02x%04x%04x\n",
+            msg->l3_sourceAdd.addr_128b[15],
+            idmanager_getMyID(ADDR_64B)->addr_64b[7],
+            msg->l2_asn.byte4,
+            msg->l2_asn.bytes2and3,
+            msg->l2_asn.bytes0and1);
+      }*/
+      icmpv6rpl_vars.busySendingDAO = FALSE;
+   }
 }
 
 /**
@@ -290,26 +306,28 @@ void sendDIO() {
       openqueue_removeAllCreatedBy(COMPONENT_ICMPv6RPL);
       
       // I'm not busy sending a DIO/DAO
-      icmpv6rpl_vars.busySending  = FALSE;
+      icmpv6rpl_vars.busySendingDIO = FALSE;
+      icmpv6rpl_vars.busySendingDAO = FALSE;
       
       // stop here
       return;
    }
    
    // do not send DIO if I have the default DAG rank
-   if (neighbors_getMyPreviousDAGrank()==DEFAULTDAGRANK) {
+   if (
+         (neighbors_getMyLowestDAGrank()==DEFAULTDAGRANK)
+         &&
+         (neighbors_getMyDAGrank()==DEFAULTDAGRANK)
+      ) {
       return;
    }
    
    // do not send DIO if I'm already busy sending
-   if (icmpv6rpl_vars.busySending==TRUE) {
+   if (icmpv6rpl_vars.busySendingDIO==TRUE) {
       return;
    }
    
    // if you get here, all good to send a DIO
-   
-   // I'm now busy sending
-   icmpv6rpl_vars.busySending = TRUE;
    
    // reserve a free packet buffer for DIO
    msg = openqueue_getFreePacketBuffer(COMPONENT_ICMPv6RPL);
@@ -317,7 +335,6 @@ void sendDIO() {
       openserial_printError(COMPONENT_ICMPv6RPL,ERR_NO_FREE_PACKET_BUFFER,
                             (errorparameter_t)0,
                             (errorparameter_t)0);
-      icmpv6rpl_vars.busySending = FALSE;
       
       return;
    }
@@ -329,6 +346,9 @@ void sendDIO() {
    // set transport information
    msg->l4_protocol                         = IANA_ICMPv6;
    msg->l4_sourcePortORicmpv6Type           = IANA_ICMPv6_RPL;
+   
+   // mark this packet as DIO for unlocking busySendingDIO while executing sendDone
+   msg->l4_isDIO = TRUE;
    
    // set DIO destination
    memcpy(&(msg->l3_destinationAdd),&icmpv6rpl_vars.dioDestination,sizeof(open_addr_t));
@@ -356,10 +376,10 @@ void sendDIO() {
    
    //send
    if (icmpv6_send(msg)!=E_SUCCESS) {
-      icmpv6rpl_vars.busySending = FALSE;
       openqueue_freePacketBuffer(msg);
    } else {
-      icmpv6rpl_vars.busySending = FALSE; 
+      // I'm now busy sending
+      icmpv6rpl_vars.busySendingDIO = TRUE; 
    }
 }
 
@@ -403,6 +423,7 @@ void sendDAO() {
    uint8_t              parentIdx;             // running parent index
    uint8_t              numTransitParents;  // the number of parents indicated in transit option
    open_addr_t         address;
+   uint8_t              asn[5];
    
    if (ieee154e_isSynch()==FALSE) {
       // I'm not sync'ed 
@@ -411,7 +432,8 @@ void sendDAO() {
       openqueue_removeAllCreatedBy(COMPONENT_ICMPv6RPL);
       
       // I'm not busy sending a DIO/DAO
-      icmpv6rpl_vars.busySending = FALSE;
+      icmpv6rpl_vars.busySendingDIO = FALSE;
+      icmpv6rpl_vars.busySendingDAO = FALSE;
       
       // stop here
       return;
@@ -427,8 +449,13 @@ void sendDAO() {
        return;
    }
    
+   // dont' send a DAO if you did not send at least a DIO
+   if (neighbors_getMyLowestDAGrank()==DEFAULTDAGRANK) {
+       return;
+   }
+   
    // dont' send a DAO if you're still busy sending the previous one
-   if (icmpv6rpl_vars.busySending==TRUE) {
+   if (icmpv6rpl_vars.busySendingDAO==TRUE) {
       return;
    }
    
@@ -507,7 +534,12 @@ void sendDAO() {
    
    //===== send
    if (icmpv6_send(msg)==E_SUCCESS) {
-      icmpv6rpl_vars.busySending = TRUE;
+      ieee154e_getAsn(asn);
+      /*printf("%02x SEND %02x ASN %02x%02x%02x%02x%02x\n",
+         idmanager_getMyID(ADDR_64B)->addr_64b[7],
+         idmanager_getMyID(ADDR_64B)->addr_64b[7],
+         asn[4],asn[3],asn[2],asn[1],asn[0]);*/
+      icmpv6rpl_vars.busySendingDAO = TRUE;
    } else {
       openqueue_freePacketBuffer(msg);
    }

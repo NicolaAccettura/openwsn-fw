@@ -6,7 +6,7 @@
 //=========================== define ==========================================
 
 // maximum of cells in a Schedule IE
-#define SCHEDULEIEMAXNUMCELLS 3
+#define SCHEDULEIEMAXNUMCELLS 10
 
 // subIE shift
 #define MLME_IE_SUBID_SHIFT            8
@@ -96,6 +96,7 @@ http://tools.ietf.org/html/draft-wang-6tisch-6top-sublayer-01#section-4.1.1.5
 */
 typedef struct {
    uint8_t         opcode;
+   uint8_t         seqNumber;
 } opcode_IE_ht;
 
 /**
@@ -149,19 +150,15 @@ uint8_t          processIE_prependChannelHoppingIE(
 );
 uint8_t          processIE_prependOpcodeIE(
    OpenQueueEntry_t*    pkt,
-   uint8_t              uResCommandID
+   opcode_IE_ht*        opcode_ie
 );
 uint8_t          processIE_prependBandwidthIE(
    OpenQueueEntry_t*    pkt,
-   uint8_t              numOfLinks, 
-   uint8_t              slotframeID
+   bandwidth_IE_ht*     bandwidth_ie
 );
 uint8_t          processIE_prependScheduleIE(
    OpenQueueEntry_t*    pkt,
-   uint8_t              type,
-   uint8_t              frameID,
-   uint8_t              flag,
-   cellInfo_ht*         cellList
+   schedule_IE_ht*      schedule_ie
 );
 
 //===== retrieve IEs

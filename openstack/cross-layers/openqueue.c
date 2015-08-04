@@ -25,6 +25,7 @@ void openqueue_init() {
    for (i=0;i<QUEUELENGTH;i++){
       openqueue_reset_entry(&(openqueue_vars.queue[i]));
    }
+   openqueue_vars.stopSendingOnShared = FALSE;
 }
 
 /**
@@ -62,11 +63,54 @@ get a new packet buffer to start creating a new packet.
 */
 OpenQueueEntry_t* openqueue_getFreePacketBuffer(uint8_t creator) {
    uint8_t i;
+   uint8_t numFree;
    INTERRUPT_DECLARATION();
    DISABLE_INTERRUPTS();
    
    // refuse to allocate if we're not in sync
    if (ieee154e_isSynch()==FALSE && creator > COMPONENT_IEEE802154E){
+     ENABLE_INTERRUPTS();
+     return NULL;
+   }
+   
+   // if you get here, I will try to allocate a buffer for you
+   
+   // walk through queue and find how many entries are free
+   numFree = 0;
+   for (i=0;i<QUEUELENGTH;i++) {
+      if (openqueue_vars.queue[i].owner==COMPONENT_NULL) {
+         numFree++;
+      }
+   }
+   
+   // let have a free packet buffer for acks, receiving EBs and sending 6top commands
+   if (numFree>NUMSUREFREEENTRIES) {
+      // walk through queue and find free entry
+      for (i=0;i<QUEUELENGTH;i++) {
+         if (openqueue_vars.queue[i].owner==COMPONENT_NULL) {
+            openqueue_vars.queue[i].creator=creator;
+            openqueue_vars.queue[i].owner=COMPONENT_OPENQUEUE;
+            ENABLE_INTERRUPTS(); 
+            return &openqueue_vars.queue[i];
+         }
+      }
+   }
+   ENABLE_INTERRUPTS();
+   return NULL;
+}
+
+OpenQueueEntry_t* openqueue_getSureFreePacketBuffer(uint8_t creator) {
+   uint8_t i;
+   INTERRUPT_DECLARATION();
+   DISABLE_INTERRUPTS();
+   
+   // refuse to allocate if we're not in sync
+   if ((creator != COMPONENT_IEEE802154E) && (creator != COMPONENT_SIXTOP_RES)){
+     ENABLE_INTERRUPTS();
+     return NULL;
+   }
+   
+   if ((ieee154e_isSynch()==FALSE) && (creator == COMPONENT_SIXTOP_RES)){
      ENABLE_INTERRUPTS();
      return NULL;
    }
@@ -85,7 +129,6 @@ OpenQueueEntry_t* openqueue_getFreePacketBuffer(uint8_t creator) {
    ENABLE_INTERRUPTS();
    return NULL;
 }
-
 
 /**
 \brief Free a previously-allocated packet buffer.
@@ -186,24 +229,65 @@ OpenQueueEntry_t* openqueue_sixtopGetReceivedPacket() {
    return NULL;
 }
 
+uint8_t openqueue_sixtopGetNumPacketsToNeighbor(open_addr_t* toNeighbor) {
+   uint8_t i;
+   uint8_t returnVal;
+   INTERRUPT_DECLARATION();
+   DISABLE_INTERRUPTS();
+   returnVal = 0;
+   if (toNeighbor->type==ADDR_64B) {
+      // a neighbor is specified, look for a packet unicast to that neighbor
+      for (i=0;i<QUEUELENGTH;i++) {
+         if (openqueue_vars.queue[i].owner==COMPONENT_SIXTOP_TO_IEEE802154E) {
+            if (packetfunctions_sameAddress(toNeighbor,&openqueue_vars.queue[i].l2_nextORpreviousHop)) {
+               returnVal++;
+            }
+         }
+      }
+   }
+   ENABLE_INTERRUPTS();
+   return returnVal;
+}
+
+void openqueue_sixtopSetStopSendingOnShared(bool stopSendingOnShared) {
+   INTERRUPT_DECLARATION();
+   DISABLE_INTERRUPTS();
+   openqueue_vars.stopSendingOnShared = stopSendingOnShared;
+   ENABLE_INTERRUPTS();
+}
+
 //======= called by IEEE80215E
 
-OpenQueueEntry_t* openqueue_macGetDataPacket(open_addr_t* toNeighbor) {
+OpenQueueEntry_t* openqueue_macGetDataPacket(open_addr_t* toNeighbor, bool couldChangeNextHop, bool* willChangeNextHop) {
    uint8_t i;
    INTERRUPT_DECLARATION();
    DISABLE_INTERRUPTS();
+   *willChangeNextHop = FALSE;
    if (toNeighbor->type==ADDR_64B) {
-      // a neighbor is specified, look for a packet unicast to that neigbhbor
+      // a neighbor is specified, look for a packet unicast to that neighbor
+      for (i=0;i<QUEUELENGTH;i++) {
+         if (openqueue_vars.queue[i].owner==COMPONENT_SIXTOP_TO_IEEE802154E) {
+            if (packetfunctions_sameAddress(toNeighbor,&openqueue_vars.queue[i].l2_nextORpreviousHop)) {
+               ENABLE_INTERRUPTS();
+               return &openqueue_vars.queue[i];
+            } else if ((couldChangeNextHop == TRUE) && (openqueue_vars.queue[i].l2_couldChangeNextHop == TRUE)) {
+               *willChangeNextHop = TRUE;
+               ENABLE_INTERRUPTS();
+               return &openqueue_vars.queue[i];
+            }
+         }
+      }
+   } else if ((toNeighbor->type==ADDR_ANYCAST) && (openqueue_vars.stopSendingOnShared == FALSE)) {
+      // anycast case: look for a packet which is either not created by RES
+      // or an KA (created by RES, but not broadcast)
       for (i=0;i<QUEUELENGTH;i++) {
          if (openqueue_vars.queue[i].owner==COMPONENT_SIXTOP_TO_IEEE802154E &&
-            packetfunctions_sameAddress(toNeighbor,&openqueue_vars.queue[i].l2_nextORpreviousHop)) {
+             openqueue_vars.queue[i].creator==COMPONENT_SIXTOP_RES
+            ) {
             ENABLE_INTERRUPTS();
             return &openqueue_vars.queue[i];
          }
       }
-   } else if (toNeighbor->type==ADDR_ANYCAST) {
-      // anycast case: look for a packet which is either not created by RES
-      // or an KA (created by RES, but not broadcast)
       for (i=0;i<QUEUELENGTH;i++) {
          if (openqueue_vars.queue[i].owner==COMPONENT_SIXTOP_TO_IEEE802154E &&
              ( openqueue_vars.queue[i].creator!=COMPONENT_SIXTOP ||
@@ -211,7 +295,16 @@ OpenQueueEntry_t* openqueue_macGetDataPacket(open_addr_t* toNeighbor) {
                    openqueue_vars.queue[i].creator==COMPONENT_SIXTOP &&
                    packetfunctions_isBroadcastMulticast(&(openqueue_vars.queue[i].l2_nextORpreviousHop))==FALSE
                 )
-             )
+             ) &&
+             openqueue_vars.queue[i].l4_isDIO == FALSE
+            ) {
+            ENABLE_INTERRUPTS();
+            return &openqueue_vars.queue[i];
+         }
+      }
+      for (i=0;i<QUEUELENGTH;i++) {
+         if (openqueue_vars.queue[i].owner==COMPONENT_SIXTOP_TO_IEEE802154E &&
+             openqueue_vars.queue[i].l4_isDIO == TRUE
             ) {
             ENABLE_INTERRUPTS();
             return &openqueue_vars.queue[i];
@@ -226,12 +319,14 @@ OpenQueueEntry_t* openqueue_macGetEBPacket() {
    uint8_t i;
    INTERRUPT_DECLARATION();
    DISABLE_INTERRUPTS();
-   for (i=0;i<QUEUELENGTH;i++) {
-      if (openqueue_vars.queue[i].owner==COMPONENT_SIXTOP_TO_IEEE802154E &&
-          openqueue_vars.queue[i].creator==COMPONENT_SIXTOP              &&
-          packetfunctions_isBroadcastMulticast(&(openqueue_vars.queue[i].l2_nextORpreviousHop))) {
-         ENABLE_INTERRUPTS();
-         return &openqueue_vars.queue[i];
+   if (openqueue_vars.stopSendingOnShared == FALSE) {
+      for (i=0;i<QUEUELENGTH;i++) {
+         if (openqueue_vars.queue[i].owner==COMPONENT_SIXTOP_TO_IEEE802154E &&
+             openqueue_vars.queue[i].creator==COMPONENT_SIXTOP              &&
+             packetfunctions_isBroadcastMulticast(&(openqueue_vars.queue[i].l2_nextORpreviousHop))) {
+            ENABLE_INTERRUPTS();
+            return &openqueue_vars.queue[i];
+         }
       }
    }
    ENABLE_INTERRUPTS();
@@ -247,6 +342,7 @@ void openqueue_reset_entry(OpenQueueEntry_t* entry) {
    entry->payload                      = &(entry->packet[127 - IEEE802154_SECURITY_TAG_LEN]); // Footer is longer if security is used
    entry->length                       = 0;
    //l4
+   entry->l4_isDIO                     = FALSE;
    entry->l4_protocol                  = IANA_UNDEFINED;
    //l3
    entry->l3_destinationAdd.type       = ADDR_NONE;
@@ -257,6 +353,7 @@ void openqueue_reset_entry(OpenQueueEntry_t* entry) {
    entry->l2_retriesLeft               = 0;
    entry->l2_IEListPresent             = 0;
    entry->l2_payloadIEpresent          = 0;
+   entry->l2_couldChangeNextHop        = FALSE;
    //l2-security
    entry->l2_securityLevel             = 0;
 }

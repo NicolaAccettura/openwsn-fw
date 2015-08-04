@@ -104,31 +104,10 @@ owerror_t iphc_sendFromForwarding(
    //XV -poipoi we want to check if the source address prefix is the same as destination prefix
    if (packetfunctions_sameAddress(&temp_dest_prefix,&temp_src_prefix)) {   
    //dest and src on same prefix
-      if (packetfunctions_sameAddress(&temp_dest_mac64b,&(msg->l2_nextORpreviousHop))) {
-         //if direct neighbors, MAC nextHop and IP destination indicate same node
-         //the source can be ME or another who I am relaying from. If its me then SAM is elided,
-         //if not SAM is 64b address 
-        if (fw_SendOrfw_Rcv==PCKTFORWARD){
-            sam = IPHC_SAM_64B;    //case forwarding a packet
-            p_src = &temp_src_mac64b;
-            //poipoi xv forcing elided addresses on src routing, this needs to be fixed so any type of address should be supported.
-        } else if (fw_SendOrfw_Rcv==PCKTSEND){
-            sam = IPHC_SAM_ELIDED;
-            p_src = NULL;
-        } else {
-           openserial_printCritical(COMPONENT_IPHC,ERR_INVALID_FWDMODE,
-                            (errorparameter_t)0,
-                            (errorparameter_t)0);
-        } 
-        dam = IPHC_DAM_ELIDED;
-        p_dest = NULL;     
-      } else {
-         //else, not a direct neighbour use 64B address
-         sam = IPHC_SAM_64B;
-         dam = IPHC_DAM_64B;
-         p_dest = &temp_dest_mac64b;      
-         p_src  = &temp_src_mac64b; 
-      }
+      sam = IPHC_SAM_64B;
+      p_src  = &temp_src_mac64b;
+      dam = IPHC_DAM_64B;
+      p_dest = &temp_dest_mac64b;
    } else {
      //not the same prefix. so the packet travels to another network
      //check if this is a source routing pkt. in case it is then the DAM is elided as it is in the SrcRouting header.
@@ -265,6 +244,12 @@ void iphc_receive(OpenQueueEntry_t* msg) {
       );
    } else {
       openbridge_receive(msg);                   //out to the OpenVisualizer
+      printf("%02x RECV %02x ASN %02x%04x%04x\n",
+         ipv6_outer_header.src.addr_128b[15],
+         idmanager_getMyID(ADDR_64B)->addr_64b[7],
+         msg->l2_asn.byte4,
+         msg->l2_asn.bytes2and3,
+         msg->l2_asn.bytes0and1);
    }
 }
 

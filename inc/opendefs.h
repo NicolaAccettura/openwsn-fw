@@ -283,6 +283,7 @@ typedef struct {
    uint8_t*      payload;                        // pointer to the start of the payload within 'packet'
    uint8_t       length;                         // length in bytes of the payload
    //l4
+   bool          l4_isDIO;                       // marks DIOs
    uint8_t       l4_protocol;                    // l4 protocol to be used
    bool          l4_protocol_compressed;         // is the l4 protocol header compressed?
    uint16_t      l4_sourcePortORicmpv6Type;      // l4 source port
@@ -310,6 +311,8 @@ typedef struct {
    bool          l2_payloadIEpresent;            // did I have payload IE field
    bool          l2_joinPriorityPresent;
    int16_t       l2_timeCorrection;              // record the timeCorrection and print out at endOfslot
+   bool          l2_couldChangeNextHop;          // if TRUE, this is a packet sent upward to the DAGroot, whose next-hop can be changed
+   uint8_t*      l2_destAddress;                 // pointer to MAC destination address
    //layer-2 security
    uint8_t       l2_securityLevel;               //the security level specified for the current frame
    uint8_t       l2_keyIdMode;                   //the key Identifier mode specified for the current frame
