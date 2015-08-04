@@ -154,7 +154,14 @@ void forwarding_sendDone(OpenQueueEntry_t* msg, owerror_t error) {
    
    if (msg->creator==COMPONENT_RADIO || msg->creator==COMPONENT_FORWARDING) {
       // this is a relayed packet
-      
+      /*if (error == E_FAIL) {
+         printf("%02x LOST %02x, ASN %02x%04x%04x\n",
+            msg->l3_sourceAdd.addr_128b[15],
+            idmanager_getMyID(ADDR_64B)->addr_64b[7],
+            msg->l2_asn.byte4,
+            msg->l2_asn.bytes2and3,
+            msg->l2_asn.bytes0and1);
+      }*/
       // free packet
       openqueue_freePacketBuffer(msg);
    } else {
@@ -269,7 +276,12 @@ void forwarding_receive(
       }
    } else {
       // this packet is not for me: relay
-      
+      /*printf("%02x FORW %02x ASN %02x%04x%04x\n",
+         msg->l3_sourceAdd.addr_128b[15],
+         idmanager_getMyID(ADDR_64B)->addr_64b[7],
+         msg->l2_asn.byte4,
+         msg->l2_asn.bytes2and3,
+         msg->l2_asn.bytes0and1);*/
       // change the creator of the packet
       msg->creator = COMPONENT_FORWARDING;
       

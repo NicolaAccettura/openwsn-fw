@@ -164,6 +164,7 @@ void schedule_setFrameLength(frameLength_t newFrameLength) {
    if (newFrameLength <= MAXACTIVESLOTS) {
       schedule_vars.maxActiveSlots = newFrameLength;
    }
+   
    ENABLE_INTERRUPTS();
 }
 
@@ -375,7 +376,7 @@ owerror_t schedule_removeActiveSlot(slotOffset_t slotOffset, open_addr_t* neighb
    // abort it could not find
    if (slotContainer>&schedule_vars.scheduleBuf[schedule_vars.maxActiveSlots-1]) {
       ENABLE_INTERRUPTS();
-      openserial_printCritical(
+      openserial_printError(
          COMPONENT_SCHEDULE,ERR_FREEING_ERROR,
          (errorparameter_t)0,
          (errorparameter_t)0
@@ -424,7 +425,6 @@ owerror_t schedule_removeActiveSlot(slotOffset_t slotOffset, open_addr_t* neighb
 }
 
 bool schedule_isSlotOffsetAvailable(uint16_t slotOffset){
-   
    scheduleEntry_t* scheduleWalker;
    
    INTERRUPT_DECLARATION();
@@ -432,20 +432,85 @@ bool schedule_isSlotOffsetAvailable(uint16_t slotOffset){
    
    scheduleWalker = schedule_vars.currentScheduleEntry;
    do {
-      if(slotOffset == scheduleWalker->slotOffset){
-          ENABLE_INTERRUPTS();
-          return FALSE;
+      if (scheduleWalker->slotOffset == slotOffset) {
+         ENABLE_INTERRUPTS();
+         return FALSE;
       }
       scheduleWalker = scheduleWalker->next;
-   }while(scheduleWalker!=schedule_vars.currentScheduleEntry);
+   } while (scheduleWalker!=schedule_vars.currentScheduleEntry);
    
    ENABLE_INTERRUPTS();
-   
    return TRUE;
 }
 
-scheduleEntry_t* schedule_statistic_poorLinkQuality(){
+void schedule_getRandomAvailableSlotOffsets(uint16_t* numSlotOffsets, uint16_t* slotOffsets) {
+   uint16_t i,j;
+   uint16_t randomValue;
+   uint16_t nbrUnavailableSlotOffsets;
+   uint16_t nbrAvailableSlotOffsets;
+   uint16_t slotsAvailableArray[MAXACTIVESLOTS];
    scheduleEntry_t* scheduleWalker;
+   
+   INTERRUPT_DECLARATION();
+   DISABLE_INTERRUPTS();
+   
+   if (schedule_vars.currentScheduleEntry == NULL) {
+      ENABLE_INTERRUPTS();
+      return;
+   }
+   
+   for (i=0;i<MAXACTIVESLOTS;i++) {
+      if (i<schedule_vars.maxActiveSlots) {
+         slotsAvailableArray[i]=TRUE;
+      } else {
+         slotsAvailableArray[i]=FALSE;
+      }
+   }
+   
+   nbrUnavailableSlotOffsets = 0;
+   scheduleWalker = schedule_vars.currentScheduleEntry;
+   do {
+      slotsAvailableArray[scheduleWalker->slotOffset] = FALSE;
+      nbrUnavailableSlotOffsets++;
+      scheduleWalker = scheduleWalker->next;
+   } while (scheduleWalker!=schedule_vars.currentScheduleEntry);
+   
+   nbrAvailableSlotOffsets = schedule_vars.maxActiveSlots - nbrUnavailableSlotOffsets;
+   
+   if (*numSlotOffsets > nbrAvailableSlotOffsets) {
+      *numSlotOffsets = nbrAvailableSlotOffsets;
+   }
+   
+   for (i=0;i<*numSlotOffsets;i++) {
+      randomValue = (openrandom_get16b()&0xff) % nbrAvailableSlotOffsets;
+      for (j=0;j<schedule_vars.maxActiveSlots;j++) {
+         if (slotsAvailableArray[j] == TRUE) {
+            if (randomValue == 0) {
+               slotsAvailableArray[j] = FALSE;
+               break;
+            } else {
+               randomValue--;
+            }
+         }
+      }
+      *slotOffsets = j;
+      slotOffsets++;
+      nbrAvailableSlotOffsets--;
+   }
+   
+   ENABLE_INTERRUPTS();
+}
+
+scheduleEntry_t* schedule_statistic_poorLinkQuality(
+      open_addr_t* neighbor,
+      scheduleEntry_t* scheduleWalkerPoorer,
+      bool checkPDRthreshold
+   ) {
+   scheduleEntry_t* scheduleWalker;
+   scheduleEntry_t* scheduleWalkerToReturn;
+   uint16_t qualityScheduleWalkerPoorer;
+   uint16_t qualityScheduleWalker;
+   uint16_t qualityScheduleWalkerToReturn;
    
    INTERRUPT_DECLARATION();
    DISABLE_INTERRUPTS();
@@ -455,23 +520,116 @@ scheduleEntry_t* schedule_statistic_poorLinkQuality(){
       ENABLE_INTERRUPTS();
       return NULL;
    }
+   
+   qualityScheduleWalkerPoorer = 0;
+   if (scheduleWalkerPoorer != NULL) {
+      qualityScheduleWalkerPoorer = 100*scheduleWalkerPoorer->numTxACK/scheduleWalkerPoorer->numTx;
+   }
+   
+   scheduleWalkerToReturn = NULL;
+   qualityScheduleWalkerToReturn = 101;
+   if (checkPDRthreshold == TRUE) {
+      qualityScheduleWalkerToReturn = PDR_THRESHOLD;
+   }
+   
+   do {
+      if (
+            (scheduleWalker != scheduleWalkerPoorer)
+            &&
+            (scheduleWalker->type == CELLTYPE_TX)
+            &&
+            (scheduleWalker->numTx > MIN_NUMTX_FOR_PDR)
+            &&
+            (
+               (neighbor->type == ADDR_NONE)
+               ||
+               (
+                  (neighbor->type != ADDR_NONE)
+                  &&
+                  (packetfunctions_sameAddress(neighbor, &(scheduleWalker->neighbor))==TRUE)
+               )
+            )
+         ) {
+         qualityScheduleWalker = 100*scheduleWalker->numTxACK/scheduleWalker->numTx;
+         if (
+               (qualityScheduleWalker >= qualityScheduleWalkerPoorer)
+               &&
+               (qualityScheduleWalker < qualityScheduleWalkerToReturn)
+            ) {
+            qualityScheduleWalkerToReturn = qualityScheduleWalker;
+            scheduleWalkerToReturn = scheduleWalker;
+         }
+      }
+      scheduleWalker = scheduleWalker->next;
+   } while (scheduleWalker!=schedule_vars.currentScheduleEntry);
+   
+   if ((neighbor->type == ADDR_NONE) && (scheduleWalkerToReturn != NULL)) {
+      memcpy(neighbor,&(scheduleWalkerToReturn->neighbor),sizeof(open_addr_t));
+   }
+   
+   ENABLE_INTERRUPTS();
+   return scheduleWalkerToReturn;
+}
+
+uint8_t schedule_getVirtualScheduledCellsToNeighbor(open_addr_t* address) {
+   scheduleEntry_t* scheduleWalker;
+   uint8_t virtualScheduledCells;
+   uint16_t temp;
+   
+   INTERRUPT_DECLARATION();
+   DISABLE_INTERRUPTS();
+   
+   temp = 0;
+   scheduleWalker = schedule_vars.currentScheduleEntry;
+   do {
+      if (
+            (scheduleWalker->type == CELLTYPE_TXRX)
+            ||
+            (
+               (scheduleWalker->type == CELLTYPE_TX)
+               &&
+               (packetfunctions_sameAddress(&(scheduleWalker->neighbor),address)==TRUE)
+            )
+         ){
+         if (scheduleWalker->numTx == 0) {
+            temp += 1<<8;
+         } else {
+            temp += (scheduleWalker->numTxACK << 8) / scheduleWalker->numTx;
+         }
+      }
+      scheduleWalker = scheduleWalker->next;
+   } while (scheduleWalker!=schedule_vars.currentScheduleEntry);
+   temp = temp >> 8;
+   virtualScheduledCells = (uint8_t) temp;
+   
+   ENABLE_INTERRUPTS();
+   
+   return virtualScheduledCells;
+}
+
+uint16_t schedule_getNumTxCellsToNeighbor(open_addr_t* address) {
+   scheduleEntry_t* scheduleWalker;
+   uint16_t         numTxCells;
+   
+   INTERRUPT_DECLARATION();
+   DISABLE_INTERRUPTS();
+   
+   numTxCells = 0;
+   scheduleWalker = schedule_vars.currentScheduleEntry;
    do {
       if(
-         scheduleWalker->numTx > MIN_NUMTX_FOR_PDR                     &&\
-         PDR_THRESHOLD > 100*scheduleWalker->numTxACK/scheduleWalker->numTx
+         (scheduleWalker->type == CELLTYPE_TX)
+         &&
+         (packetfunctions_sameAddress(&(scheduleWalker->neighbor),address)==TRUE)
       ){
-         break;
+         numTxCells++;
       }
       scheduleWalker = scheduleWalker->next;
    }while(scheduleWalker!=schedule_vars.currentScheduleEntry);
    
-   if (scheduleWalker == schedule_vars.currentScheduleEntry){
-       ENABLE_INTERRUPTS();
-       return NULL;
-   } else {
-       ENABLE_INTERRUPTS();
-       return scheduleWalker;
-   }
+   ENABLE_INTERRUPTS();
+   
+   return numTxCells;
 }
 
 //=== from IEEE802154E: reading the schedule and updating statistics
@@ -519,6 +677,19 @@ slotOffset_t schedule_getNextActiveSlotOffset() {
    DISABLE_INTERRUPTS();
    
    res = ((scheduleEntry_t*)(schedule_vars.currentScheduleEntry->next))->slotOffset;
+   
+   ENABLE_INTERRUPTS();
+   
+   return res;
+}
+
+cellType_t schedule_getNextActiveSlotOffsetType() {
+   cellType_t res;
+   
+   INTERRUPT_DECLARATION();
+   DISABLE_INTERRUPTS();
+   
+   res = ((scheduleEntry_t*)(schedule_vars.currentScheduleEntry->next))->type;
    
    ENABLE_INTERRUPTS();
    

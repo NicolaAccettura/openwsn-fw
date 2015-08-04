@@ -129,6 +129,7 @@ void ieee802154_prependHeader(OpenQueueEntry_t* msg,
          case ADDR_16B:
          case ADDR_64B:
             packetfunctions_writeAddress(msg,nextHop,OW_LITTLE_ENDIAN);
+            msg->l2_destAddress = msg->payload;
             break;
          default:
             openserial_printCritical(COMPONENT_IEEE802154,ERR_WRONG_ADDR_TYPE,

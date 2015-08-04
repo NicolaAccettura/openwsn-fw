@@ -17,6 +17,7 @@
 #include "IEEE802154E_obj.h"
 #include "IEEE802154_security_obj.h"
 #include "adaptive_sync_obj.h"
+#include "otf_obj.h"
 #include "neighbors_obj.h"
 #include "processIE_obj.h"
 #include "sixtop_obj.h"
@@ -219,6 +220,7 @@ struct OpenMote {
    tcp_vars_t           tcp_vars;
    // l3
    // l2b
+   otf_vars_t           otf_vars;
    sixtop_vars_t        sixtop_vars;
    neighbors_vars_t     neighbors_vars;
    schedule_vars_t      schedule_vars;

@@ -19,17 +19,19 @@
 #define BADNEIGHBORMAXRSSI        -80 //dBm
 #define GOODNEIGHBORMINRSSI       -90 //dBm
 #define SWITCHSTABILITYTHRESHOLD  3
-#define DEFAULTLINKCOST           15
+#define DEFAULTLINKCOST           16
+
+#define DEFAULTJOINPRIORITY       255
 
 #define MAXDAGRANK                0xffff
 #define DEFAULTDAGRANK            MAXDAGRANK
 #define MINHOPRANKINCREASE        256  //default value in RPL and Minimal 6TiSCH draft
 #define PARENTSETSIZE             2
 #define PARENTSWITCHTHRESHOLD     3 * MINHOPRANKINCREASE
+#define MAXRANKINCREASE           4 * MINHOPRANKINCREASE
 
 //=========================== typedef =========================================
 
-BEGIN_PACK
 typedef struct {
    bool             used;
    uint8_t          parentPreference;
@@ -45,13 +47,26 @@ typedef struct {
    uint8_t          numWraps;//number of times the tx counter wraps. can be removed if memory is a restriction. also check openvisualizer then.
    asn_t            asn;
    uint8_t          joinPrio;
+   uint8_t          requiredVirtualCells;
+   uint8_t          aveRequiredVirtualCells;
 } neighborRow_t;
-END_PACK
 
 BEGIN_PACK
 typedef struct {
-   uint8_t         row;
-   neighborRow_t   neighborEntry;
+   uint8_t          row;
+   bool             used;
+   uint8_t          parentPreference;
+   bool             stableNeighbor;
+   uint8_t          switchStabilityCounter;
+   open_addr_t      addr_64b;
+   dagrank_t        DAGrank;
+   int8_t           rssi;
+   uint8_t          numRx;
+   uint8_t          numTx;
+   uint8_t          numTxACK;
+   uint8_t          numWraps;//number of times the tx counter wraps. can be removed if memory is a restriction. also check openvisualizer then.
+   asn_t            asn;
+   uint8_t          joinPrio;
 } debugNeighborEntry_t;
 END_PACK
 
@@ -62,7 +77,6 @@ typedef struct {
    uint8_t              parents[PARENTSETSIZE];
    uint8_t              currentParentIndex;
    dagrank_t            myDAGrank;
-   dagrank_t            myPreviousDAGrank;
    dagrank_t            myLowestDAGrank;
    uint8_t              debugRow;
    opentimer_id_t       timerId;
@@ -76,19 +90,28 @@ void          neighbors_init(void);
 
 // getters
 dagrank_t     neighbors_getMyDAGrank(void);
-dagrank_t     neighbors_getMyPreviousDAGrank(void); 
+dagrank_t     neighbors_getMyLowestDAGrank(void);
 uint8_t       neighbors_getNumNeighbors(void);
 bool          neighbors_getPreferredParentEui64(open_addr_t* addressToWrite);
 bool          neighbors_getParentByIndex(open_addr_t* addressToWrite, uint8_t parentIdx);
-bool          neighbors_getNextHopParent(open_addr_t* addressToWrite);
+void          neighbors_getNextHopParent(open_addr_t* addressToWrite);
 open_addr_t*  neighbors_getKANeighbor(uint16_t kaPeriod);
+bool          neighbors_getOTFstatisticsByIndex(
+   uint8_t        neighborIndex,
+   open_addr_t*   address,
+   uint8_t*       requiredVirtualCells,
+   uint8_t*       aveRequiredVirtualCells
+);
 // setters
 void          neighbors_setMyDAGrank(dagrank_t rank);
 void          neighbors_setAdvertizedDAGrank(void);
+void          neighbors_updateEnqueuedPacketsToNeighbor(open_addr_t* address);
+void          neighbors_resetOTFstatistics(void);
 
 // interrogators
 bool          neighbors_isStableNeighbor(open_addr_t* address);
 bool          neighbors_isPreferredParent(open_addr_t* address);
+bool          neighbors_isParent(open_addr_t* address);
 bool          neighbors_isNeighborWithLowerDAGrank(uint8_t index);
 bool          neighbors_isNeighborWithHigherDAGrank(uint8_t index);
 
@@ -102,8 +125,7 @@ void          neighbors_indicateRx(
 );
 void          neighbors_indicateTx(
    open_addr_t*         dest,
-   uint8_t              numTxAttempts,
-   bool                 was_finally_acked,
+   bool                 succesfullTx,
    asn_t*               asnTimestamp
 );
 void          neighbors_indicateRxDIO(OpenQueueEntry_t* msg, bool* newDODAGID);

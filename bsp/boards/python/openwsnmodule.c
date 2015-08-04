@@ -60,6 +60,7 @@ static PyObject* OpenMote_getState(OpenMote* self) {
    PyObject* icmpv6rpl_vars;
    PyObject* opencoap_vars;
    PyObject* tcp_vars;
+   PyObject* otf_vars;
    PyObject* neighbors_vars;
    PyObject* sixtop_vars;
    PyObject* schedule_vars;
@@ -124,6 +125,11 @@ static PyObject* OpenMote_getState(OpenMote* self) {
    tcp_vars = PyDict_New();
    // TODO
    PyDict_SetItemString(returnVal, "tcp_vars", tcp_vars);
+   
+   // otf_vars
+   otf_vars = PyDict_New();
+   // TODO
+   PyDict_SetItemString(returnVal, "otf_vars", otf_vars);
    
    // neighbors_vars
    neighbors_vars = PyDict_New();

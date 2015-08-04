@@ -222,12 +222,22 @@ port_INLINE uint8_t processIE_prependChannelHoppingIE(OpenQueueEntry_t* pkt){
 
 port_INLINE uint8_t processIE_prependOpcodeIE(
       OpenQueueEntry_t* pkt,
-      uint8_t           uResCommandID
+      opcode_IE_ht*     opcode_ie
    ){
    uint8_t    len;
    mlme_IE_ht mlme_subHeader;
   
    len = 0;
+   
+   //===== sequence number
+      
+   // reserve space
+   packetfunctions_reserveHeaderSize(pkt,sizeof(uint8_t));
+   
+   // write header
+   *((uint8_t*)(pkt->payload)) = opcode_ie->seqNumber;
+   
+   len += 1; 
    
    //===== command ID
    
@@ -235,7 +245,7 @@ port_INLINE uint8_t processIE_prependOpcodeIE(
    packetfunctions_reserveHeaderSize(pkt,sizeof(uint8_t));
    
    // write header
-   *((uint8_t*)(pkt->payload)) = uResCommandID;
+   *((uint8_t*)(pkt->payload)) = opcode_ie->opcode;
    
    len += 1;  
   
@@ -261,8 +271,7 @@ port_INLINE uint8_t processIE_prependOpcodeIE(
 
 port_INLINE uint8_t processIE_prependBandwidthIE(
       OpenQueueEntry_t* pkt, 
-      uint8_t           numOfLinks, 
-      uint8_t           slotframeID
+      bandwidth_IE_ht*  bandwidth_ie
    ){
    
    uint8_t    len;
@@ -276,7 +285,7 @@ port_INLINE uint8_t processIE_prependBandwidthIE(
    packetfunctions_reserveHeaderSize(pkt,sizeof(uint8_t));
    
    // write header
-   *((uint8_t*)(pkt->payload)) = numOfLinks;
+   *((uint8_t*)(pkt->payload)) = bandwidth_ie->numOfLinks;
    
    len += 1;
    
@@ -286,7 +295,7 @@ port_INLINE uint8_t processIE_prependBandwidthIE(
    packetfunctions_reserveHeaderSize(pkt,sizeof(uint8_t));
    
    // write header
-   *((uint8_t*)(pkt->payload)) = slotframeID;
+   *((uint8_t*)(pkt->payload)) = bandwidth_ie->slotframeID;
    
    len += 1;
    
@@ -313,10 +322,7 @@ port_INLINE uint8_t processIE_prependBandwidthIE(
 
 port_INLINE uint8_t processIE_prependScheduleIE(
       OpenQueueEntry_t* pkt,
-      uint8_t           type,
-      uint8_t           frameID,
-      uint8_t           flag,
-      cellInfo_ht*      cellList
+      schedule_IE_ht*   schedule_ie
    ){
    uint8_t    i;
    uint8_t    len;
@@ -330,17 +336,17 @@ port_INLINE uint8_t processIE_prependScheduleIE(
    //===== cell list
    
    for(i=0;i<SCHEDULEIEMAXNUMCELLS;i++) {
-      if(cellList[i].linkoptions != CELLTYPE_OFF){
+      if(schedule_ie->cellList[i].linkoptions != CELLTYPE_OFF){
          // cellobjects:
          // - [2B] slotOffset
          // - [2B] channelOffset
          // - [1B] link_type
          packetfunctions_reserveHeaderSize(pkt,5); 
-         pkt->payload[0] = (uint8_t)(cellList[i].tsNum  & 0x00FF);
-         pkt->payload[1] = (uint8_t)((cellList[i].tsNum & 0xFF00)>>8);
-         pkt->payload[2] = (uint8_t)(cellList[i].choffset  & 0x00FF);
-         pkt->payload[3] = (uint8_t)((cellList[i].choffset & 0xFF00)>>8);
-         pkt->payload[4] = cellList[i].linkoptions;
+         pkt->payload[0] = (uint8_t)(schedule_ie->cellList[i].tsNum  & 0x00FF);
+         pkt->payload[1] = (uint8_t)((schedule_ie->cellList[i].tsNum & 0xFF00)>>8);
+         pkt->payload[2] = (uint8_t)(schedule_ie->cellList[i].choffset  & 0x00FF);
+         pkt->payload[3] = (uint8_t)((schedule_ie->cellList[i].choffset & 0xFF00)>>8);
+         pkt->payload[4] = schedule_ie->cellList[i].linkoptions;
          len += 5;
          numOfCells++;
       }
@@ -357,7 +363,7 @@ port_INLINE uint8_t processIE_prependScheduleIE(
    
    // prepare header
    temp8b  = numOfCells;
-   temp8b |= flag << 7;
+   temp8b |= schedule_ie->flag << 7;
    
    // copy header
    *((uint8_t*)(pkt->payload)) = temp8b;
@@ -370,7 +376,7 @@ port_INLINE uint8_t processIE_prependScheduleIE(
    packetfunctions_reserveHeaderSize(pkt,sizeof(uint8_t));
    
    // prepare header
-   temp8b = frameID;
+   temp8b = schedule_ie->frameID;
    
    // copy header
    *((uint8_t*)(pkt->payload)) = temp8b;
@@ -378,7 +384,7 @@ port_INLINE uint8_t processIE_prependScheduleIE(
    len += 1;
   
    // record the frameID 
-   pkt->l2_scheduleIE_frameID = frameID;
+   pkt->l2_scheduleIE_frameID = schedule_ie->frameID;
    
    //===== length
    
@@ -400,7 +406,7 @@ port_INLINE uint8_t processIE_prependScheduleIE(
    packetfunctions_reserveHeaderSize(pkt,sizeof(uint8_t));
    
    // prepare header
-   temp8b = type;
+   temp8b = schedule_ie->type;
    
    // copy header
    *((uint8_t*)(pkt->payload)) = temp8b;
@@ -522,6 +528,9 @@ port_INLINE void processIE_retrieveOpcodeIE(
    localptr=*ptr; 
    
    opcodeInfo->opcode = *((uint8_t*)(pkt->payload)+localptr);
+   localptr++;
+   
+   opcodeInfo->seqNumber = *((uint8_t*)(pkt->payload)+localptr);
    localptr++;
   
    *ptr=localptr; 
