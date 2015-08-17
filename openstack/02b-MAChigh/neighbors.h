@@ -9,11 +9,13 @@
 */
 #include "opendefs.h"
 #include "icmpv6rpl.h"
+#include "opentimers.h"
 
 //=========================== define ==========================================
 
 #define MAXNUMNEIGHBORS           10
 #define MAXPREFERENCE             2
+#define INTERMEDIATEPREFERENCE    1
 #define BADNEIGHBORMAXRSSI        -80 //dBm
 #define GOODNEIGHBORMINRSSI       -90 //dBm
 #define SWITCHSTABILITYTHRESHOLD  3
@@ -22,6 +24,8 @@
 #define MAXDAGRANK                0xffff
 #define DEFAULTDAGRANK            MAXDAGRANK
 #define MINHOPRANKINCREASE        256  //default value in RPL and Minimal 6TiSCH draft
+#define PARENTSETSIZE             2
+#define PARENTSWITCHTHRESHOLD     3 * MINHOPRANKINCREASE
 
 //=========================== typedef =========================================
 
@@ -33,6 +37,7 @@ typedef struct {
    uint8_t          switchStabilityCounter;
    open_addr_t      addr_64b;
    dagrank_t        DAGrank;
+   dagrank_t        resultingDAGrank;
    int8_t           rssi;
    uint8_t          numRx;
    uint8_t          numTx;
@@ -50,22 +55,18 @@ typedef struct {
 } debugNeighborEntry_t;
 END_PACK
 
-BEGIN_PACK
-typedef struct {
-   uint8_t         last_addr_byte;   // last byte of the neighbor's address
-   int8_t          rssi;
-   uint8_t         parentPreference;
-   dagrank_t       DAGrank;
-   uint16_t        asn; 
-} netDebugNeigborEntry_t;
-END_PACK
-
 //=========================== module variables ================================
    
 typedef struct {
    neighborRow_t        neighbors[MAXNUMNEIGHBORS];
+   uint8_t              parents[PARENTSETSIZE];
+   uint8_t              currentParentIndex;
    dagrank_t            myDAGrank;
+   dagrank_t            myPreviousDAGrank;
+   dagrank_t            myLowestDAGrank;
    uint8_t              debugRow;
+   opentimer_id_t       timerId;
+   uint32_t             cleanupDelay;
    icmpv6rpl_dio_ht*    dio; //keep it global to be able to debug correctly.
 } neighbors_vars_t;
 
@@ -75,11 +76,15 @@ void          neighbors_init(void);
 
 // getters
 dagrank_t     neighbors_getMyDAGrank(void);
+dagrank_t     neighbors_getMyPreviousDAGrank(void); 
 uint8_t       neighbors_getNumNeighbors(void);
 bool          neighbors_getPreferredParentEui64(open_addr_t* addressToWrite);
+bool          neighbors_getParentByIndex(open_addr_t* addressToWrite, uint8_t parentIdx);
+bool          neighbors_getNextHopParent(open_addr_t* addressToWrite);
 open_addr_t*  neighbors_getKANeighbor(uint16_t kaPeriod);
 // setters
 void          neighbors_setMyDAGrank(dagrank_t rank);
+void          neighbors_setAdvertizedDAGrank(void);
 
 // interrogators
 bool          neighbors_isStableNeighbor(open_addr_t* address);
@@ -101,7 +106,7 @@ void          neighbors_indicateTx(
    bool                 was_finally_acked,
    asn_t*               asnTimestamp
 );
-void          neighbors_indicateRxDIO(OpenQueueEntry_t* msg);
+void          neighbors_indicateRxDIO(OpenQueueEntry_t* msg, bool* newDODAGID);
 
 // get addresses
 void          neighbors_getNeighbor(open_addr_t* address,uint8_t addr_type,uint8_t index);
